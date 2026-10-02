@@ -67,8 +67,15 @@ module "eks" {
   cluster_endpoint_public_access = true
 
   cluster_addons = {
-    enabled    = true
-    node_pools = ["general-purpose"]
+    coredns = {
+      most_recent = true
+    }
+    kube-proxy = {
+      most_recent = true
+    }
+    vpc-cni = {
+      most_recent = true
+    }
   }
 
   vpc_id                   = aws_vpc.main.id
