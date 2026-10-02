@@ -59,14 +59,14 @@ resource "aws_subnet" "subnet_3" {
 
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
-  version = "~> 21.0"
+  version = "~> 20.31"
 
-  name    = "k8s-aws-agentic-cluster"
-  kubernetes_version = "1.33"
+  cluster_name    = "k8s-aws-agentic-cluster"
+  cluster_version = "1.31"
 
-  endpoint_public_access = true
+  cluster_endpoint_public_access = true
 
-  compute_config = {
+  cluster_addons = {
     enabled    = true
     node_pools = ["general-purpose"]
   }
