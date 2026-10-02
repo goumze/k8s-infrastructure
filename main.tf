@@ -59,14 +59,14 @@ resource "aws_subnet" "subnet_3" {
 
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
-  version = "~> 20.31"
+  version = "~> 21.0"
 
-  cluster_name    = "k8s-aws-agentic-cluster"
-  cluster_version = "1.31"
+  name               = "k8s-aws-agentic-cluster"
+  kubernetes_version = "1.31"
 
-  cluster_endpoint_public_access = true
+  endpoint_public_access = true
 
-  cluster_addons = {
+  addons = {
     coredns = {
       most_recent = true
     }
