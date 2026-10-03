@@ -1,60 +1,51 @@
+data "aws_availability_zones" "available" {}
+
 resource "aws_vpc" "main" {
   cidr_block           = "10.0.0.0/16"
   enable_dns_hostnames = true
+
+  tags = {
+    Name = "main-vpc"
+  }
 }
+
+resource "aws_subnet" "public_subnet" {
+ count                   = 2
+ vpc_id                  = aws_vpc.main.id
+ cidr_block              = cidrsubnet(aws_vpc.main.cidr_block, 8, count.index)
+ availability_zone       = data.aws_availability_zones.available.names[count.index]
+ map_public_ip_on_launch = true
+
+ tags = {
+   Name = "public-subnet-${count.index}"
+ }
+}
+
 
 resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
-}
-
-resource "aws_route_table" "main" {
-  vpc_id = aws_vpc.main.id
-
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.main.id
-  }
-
-  route {
-    cidr_block = "10.0.0.0/16"
-    gateway_id = "local"
+  tags = {
+    Name = "main-internet-gateway"
   }
 }
 
-resource "aws_route_table_association" "subnet_1_association" {
-  subnet_id      = aws_subnet.subnet_1.id
-  route_table_id = aws_route_table.main.id
+resource "aws_route_table" "public" {
+ vpc_id = aws_vpc.main.id
+
+ route {
+   cidr_block = "0.0.0.0/0"
+   gateway_id = aws_internet_gateway.main.id
+ }
+
+ tags = {
+   Name = "main-route-table"
+ }
 }
 
-resource "aws_route_table_association" "subnet_2_association" {
-  subnet_id      = aws_subnet.subnet_2.id
-  route_table_id = aws_route_table.main.id
-}
-
-resource "aws_route_table_association" "subnet_3_association" {
-  subnet_id      = aws_subnet.subnet_3.id
-  route_table_id = aws_route_table.main.id
-}
-
-resource "aws_subnet" "subnet_1" {
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = "10.0.1.0/24"
-  availability_zone       = "ap-south-1a"
-  map_public_ip_on_launch = true
-}
-
-resource "aws_subnet" "subnet_2" {
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = "10.0.2.0/24"
-  availability_zone       = "ap-south-1b"
-  map_public_ip_on_launch = true
-}
-
-resource "aws_subnet" "subnet_3" {
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = "10.0.3.0/24"
-  availability_zone       = "ap-south-1c"
-  map_public_ip_on_launch = true
+resource "aws_route_table_association" "subnet_association" {
+ count          = 2
+ subnet_id      = aws_subnet.public_subnet.*.id[count.index]
+ route_table_id = aws_route_table.public.id
 }
 
 module "eks" {
@@ -79,13 +70,13 @@ module "eks" {
   }
 
   vpc_id                   = aws_vpc.main.id
-  subnet_ids               = [aws_subnet.subnet_1.id, aws_subnet.subnet_2.id, aws_subnet.subnet_3.id]
-  control_plane_subnet_ids = [aws_subnet.subnet_1.id, aws_subnet.subnet_2.id, aws_subnet.subnet_3.id]
+  subnet_ids               = aws_subnet.public_subnet.*.id
+  control_plane_subnet_ids = aws_subnet.public_subnet.*.id
 
   eks_managed_node_groups = {
     green = {
-      ami_type       = "AL2023_x86_64_STANDARD"
-      instance_types = ["a1.xlarge"]
+      #ami_type       = "AL2023_x86_64_STANDARD"
+      instance_types = ["t3.medium"]
 
       min_size     = 1
       max_size     = 1
@@ -93,4 +84,8 @@ module "eks" {
     }
   }
 }
+
+#https://spacelift.io/blog/terraform-eks
+#https://dev.to/aws-builders/building-an-amazon-eks-cluster-with-raw-terraform-resources-1gj0
+#https://dev.to/aws-builders/building-an-amazon-eks-cluster-with-raw-terraform-resources-1gj0
 
