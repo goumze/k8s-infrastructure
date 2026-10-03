@@ -40,7 +40,7 @@ jobs:
     #   if: github.ref == 'refs/heads/main'
     #   run: terraform apply -auto-approve
 
-    #Run destroy pipeline, for the main branch
+    #Run destroy pipeline, for the main branch for destroying resources
     # Destroy node groups first to avoid ResourceInUseException
     # Must target specific node group key "green" due to for_each in EKS module
     - name: Terraform Destroy Node Groups
