@@ -61,7 +61,7 @@ module "eks" {
   source  = "terraform-aws-modules/eks/aws"
   version = "~> 21.0"
 
-  name               = "k8s-aws-agentic-cluster"
+  name               = "k8s-agentic-ai-cluster"
   kubernetes_version = "1.33"
 
   endpoint_public_access = true
