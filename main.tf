@@ -62,7 +62,7 @@ module "eks" {
   version = "~> 21.0"
 
   name               = "k8s-aws-agentic-cluster"
-  kubernetes_version = "1.31"
+  kubernetes_version = "1.33"
 
   endpoint_public_access = true
 
