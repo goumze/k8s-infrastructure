@@ -1,14 +1,11 @@
 data "aws_availability_zones" "available" {}
 
 resource "aws_vpc" "main" {
-  cidr_block           = "10.0.0.0/16"
-  enable_dns_hostnames = true
-  enable_dns_support   = true
+ cidr_block = "10.0.0.0/16"
 
-  tags = {
-    Name = "main-vpc"
-    "kubernetes.io/cluster/k8s-agentic-ai-cluster" = "shared"
-  }
+ tags = {
+   Name = "main-vpc-eks"
+ }
 }
 
 resource "aws_subnet" "public_subnet" {
@@ -20,21 +17,15 @@ resource "aws_subnet" "public_subnet" {
 
  tags = {
    Name = "public-subnet-${count.index}"
-   "kubernetes.io/cluster/k8s-agentic-ai-cluster" = "shared"
-   "kubernetes.io/role/elb"                        = "1"
  }
 }
 
-
 resource "aws_internet_gateway" "main" {
-  vpc_id = aws_vpc.main.id
-  
-  # Ensure EKS and all nodes are destroyed before detaching IGW
-  depends_on = [module.eks]
-  
-  tags = {
-    Name = "main-internet-gateway"
-  }
+ vpc_id = aws_vpc.main.id
+
+ tags = {
+   Name = "main-igw"
+ }
 }
 
 resource "aws_route_table" "public" {
@@ -50,12 +41,10 @@ resource "aws_route_table" "public" {
  }
 }
 
-resource "aws_route_table_association" "subnet_association" {
+resource "aws_route_table_association" "a" {
  count          = 2
  subnet_id      = aws_subnet.public_subnet.*.id[count.index]
  route_table_id = aws_route_table.public.id
- 
- depends_on = [module.eks]
 }
 
 module "eks" {
@@ -66,38 +55,36 @@ module "eks" {
   kubernetes_version = "1.33"
 
   endpoint_public_access  = true
-  endpoint_private_access = true
+  #endpoint_private_access = true
+  enable_cluster_creator_admin_permissions = true
 
   # IMPORTANT: During destroy, run these commands manually:
   # terraform destroy -target='module.eks.aws_eks_node_group.this["green"]' -auto-approve
   # sleep 180
   # terraform destroy -auto-approve
   
-  addons = {
-    coredns = {
-      most_recent = true
-    }
-    kube-proxy = {
-      most_recent = true
-    }
-    vpc-cni = {
-      most_recent = true
-    }
-  }
+  # addons = {
+  #   coredns = {
+  #     most_recent = true
+  #   }
+  #   kube-proxy = {
+  #     most_recent = true
+  #   }
+  #   vpc-cni = {
+  #     most_recent = true
+  #   }
+  # }
 
   vpc_id                   = aws_vpc.main.id
   subnet_ids               = aws_subnet.public_subnet.*.id
-  control_plane_subnet_ids = aws_subnet.public_subnet.*.id
+  #control_plane_subnet_ids = aws_subnet.public_subnet.*.id
 
   eks_managed_node_groups = {
     green = {
-      #ami_type       = "AL2023_x86_64_STANDARD"
       instance_types = ["t3.medium"]
-
       min_size     = 1
-      max_size     = 1
-      desired_size = 1
-      
+      max_size     = 3
+      desired_size = 2
       # Allow proper termination during destroy
       tags = {
         Name = "eks-node-green"
@@ -108,6 +95,30 @@ module "eks" {
     }
   }
 }
+
+# module "eks" {
+#   source  = "terraform-aws-modules/eks/aws"
+#   version = "~> 21.0"
+
+#   name               = "my-cluster"
+#   kubernetes_version = "1.33"
+
+#   enable_cluster_creator_admin_permissions = true
+
+#   vpc_id     = aws_vpc.main.id
+#   subnet_ids = aws_subnet.public_subnet.*.id
+
+#   eks_managed_node_groups = {
+#     example = {
+#       ami_type       = "AL2023_x86_64_STANDARD"
+#       instance_types = ["m5.xlarge"]
+
+#       min_size     = 2
+#       max_size     = 10
+#       desired_size = 2
+#     }
+#   }
+# }
 
 #https://spacelift.io/blog/terraform-eks
 #https://dev.to/aws-builders/building-an-amazon-eks-cluster-with-raw-terraform-resources-1gj0
