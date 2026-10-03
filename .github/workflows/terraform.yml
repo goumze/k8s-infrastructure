@@ -41,14 +41,42 @@ jobs:
     #   run: terraform apply -auto-approve
 
     #Run destroy pipeline, for the main branch for destroying resources
-    # Destroy node groups first to avoid ResourceInUseException
-    # Must target specific node group key "green" due to for_each in EKS module
+    # STEP 1: Force terminate EC2 instances first before destroying node group
+    - name: Force Terminate EC2 Instances from Node Group
+      if: github.ref == 'refs/heads/main'
+      run: |
+        set +e
+        CLUSTER_NAME="k8s-agentic-ai-cluster"
+        echo "Getting EC2 instances from node group..."
+        
+        # Get all instance IDs from the node group
+        INSTANCE_IDS=$(aws ec2 describe-instances \
+          --filters "Name=tag:eks:nodegroup-name,Values=green" "Name=instance-state-name,Values=running" \
+          --query 'Reservations[].Instances[].InstanceId' \
+          --output text 2>/dev/null)
+        
+        if [ -n "$INSTANCE_IDS" ] && [ "$INSTANCE_IDS" != "None" ]; then
+          echo "Found instances: $INSTANCE_IDS"
+          echo "Force terminating instances..."
+          for instance_id in $INSTANCE_IDS; do
+            echo "Terminating instance: $instance_id"
+            aws ec2 terminate-instances --instance-ids "$instance_id" 2>/dev/null || true
+          done
+          echo "Waiting 30 seconds for instance termination..."
+          sleep 30
+        else
+          echo "No running instances found in node group"
+        fi
+        set -e
+      continue-on-error: true
+    
+    # STEP 2: Destroy node group via Terraform
     - name: Terraform Destroy Node Groups
       if: github.ref == 'refs/heads/main'
       run: terraform destroy -target='module.eks.aws_eks_node_group.this["green"]' -auto-approve
       continue-on-error: true
     
-    # # Force delete node groups via AWS CLI if they still exist
+    # STEP 3: Force delete node groups via AWS CLI if they still exist
     - name: Force Delete Node Groups via AWS CLI
       if: github.ref == 'refs/heads/main'
       run: |
@@ -72,7 +100,7 @@ jobs:
         set -e
       continue-on-error: true
     
-    # # Wait for EC2 instances to terminate (3 minutes)
+    # STEP 4: Wait for EC2 instances to terminate completely (3 minutes)
     - name: Wait for EC2 Instances to Terminate
       if: github.ref == 'refs/heads/main'
       run: sleep 180
