@@ -7,6 +7,7 @@ resource "aws_vpc" "main" {
 
   tags = {
     Name = "main-vpc"
+    "kubernetes.io/cluster/k8s-agentic-ai-cluster" = "shared"
   }
 }
 
@@ -15,10 +16,12 @@ resource "aws_subnet" "public_subnet" {
  vpc_id                  = aws_vpc.main.id
  cidr_block              = cidrsubnet(aws_vpc.main.cidr_block, 8, count.index)
  availability_zone       = data.aws_availability_zones.available.names[count.index]
- map_public_ip_on_launch = false
+ map_public_ip_on_launch = true
 
  tags = {
    Name = "public-subnet-${count.index}"
+   "kubernetes.io/cluster/k8s-agentic-ai-cluster" = "shared"
+   "kubernetes.io/role/elb"                        = "1"
  }
 }
 
