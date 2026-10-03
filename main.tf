@@ -66,7 +66,7 @@ module "eks" {
   endpoint_private_access = true
 
   # IMPORTANT: During destroy, run these commands manually:
-  # terraform destroy -target='module.eks.aws_eks_node_group.this' -auto-approve
+  # terraform destroy -target='module.eks.aws_eks_node_group.this["green"]' -auto-approve
   # sleep 180
   # terraform destroy -auto-approve
   

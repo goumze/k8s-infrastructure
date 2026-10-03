@@ -42,9 +42,10 @@ jobs:
 
     #Run destroy pipeline, for the main branch
     # Destroy node groups first to avoid ResourceInUseException
+    # Must target specific node group key "green" due to for_each in EKS module
     - name: Terraform Destroy Node Groups
       if: github.ref == 'refs/heads/main'
-      run: terraform destroy -target='module.eks.aws_eks_node_group.this' -auto-approve
+      run: terraform destroy -target='module.eks.aws_eks_node_group.this["green"]' -auto-approve
       continue-on-error: true
     
     # Wait for EC2 instances to terminate (3 minutes)
