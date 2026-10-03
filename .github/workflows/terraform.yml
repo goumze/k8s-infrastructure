@@ -56,14 +56,20 @@ jobs:
     - name: Force Terminate Remaining EC2 Instances
       if: github.ref == 'refs/heads/main'
       run: |
-        VPC_ID=$(terraform output -raw vpc_id 2>/dev/null || echo "")
-        if [ ! -z "$VPC_ID" ]; then
-          INSTANCE_IDS=$(aws ec2 describe-instances --filters "Name=vpc-id,Values=$VPC_ID" "Name=instance-state-name,Values=running" --query 'Reservations[].Instances[].InstanceId' --output text)
-          if [ ! -z "$INSTANCE_IDS" ]; then
-            aws ec2 terminate-instances --instance-ids $INSTANCE_IDS
+        set +e
+        VPC_ID=$(terraform output -raw vpc_id 2>/dev/null)
+        if [ -n "$VPC_ID" ]; then
+          INSTANCE_IDS=$(aws ec2 describe-instances \
+            --filters "Name=vpc-id,Values=$VPC_ID" "Name=instance-state-name,Values=running" \
+            --query 'Reservations[].Instances[].InstanceId' \
+            --output text 2>/dev/null)
+          if [ -n "$INSTANCE_IDS" ]; then
+            echo "Terminating instances: $INSTANCE_IDS"
+            aws ec2 terminate-instances --instance-ids $INSTANCE_IDS 2>/dev/null || true
             sleep 60
           fi
         fi
+        set -e
       continue-on-error: true
     
     # Then destroy all remaining resources
@@ -76,12 +82,21 @@ jobs:
     - name: Force Cleanup Internet Gateway
       if: github.ref == 'refs/heads/main'
       run: |
-        VPC_ID=$(terraform output -raw vpc_id 2>/dev/null || echo "")
-        if [ ! -z "$VPC_ID" ]; then
-          IGW_ID=$(aws ec2 describe-internet-gateways --filters "Name=attachment.vpc-id,Values=$VPC_ID" --query 'InternetGateways[0].InternetGatewayId' --output text)
-          if [ ! -z "$IGW_ID" ] && [ "$IGW_ID" != "None" ]; then
-            aws ec2 detach-internet-gateway --internet-gateway-id $IGW_ID --vpc-id $VPC_ID 2>/dev/null || true
-            aws ec2 delete-internet-gateway --internet-gateway-id $IGW_ID 2>/dev/null || true
+        set +e
+        VPC_ID=$(terraform output -raw vpc_id 2>/dev/null)
+        if [ -n "$VPC_ID" ]; then
+          echo "VPC ID: $VPC_ID"
+          IGW_ID=$(aws ec2 describe-internet-gateways \
+            --filters "Name=attachment.vpc-id,Values=$VPC_ID" \
+            --query 'InternetGateways[0].InternetGatewayId' \
+            --output text 2>/dev/null)
+          if [ -n "$IGW_ID" ] && [ "$IGW_ID" != "None" ]; then
+            echo "Detaching IGW: $IGW_ID from VPC: $VPC_ID"
+            aws ec2 detach-internet-gateway --internet-gateway-id "$IGW_ID" --vpc-id "$VPC_ID" 2>/dev/null || true
+            sleep 30
+            echo "Deleting IGW: $IGW_ID"
+            aws ec2 delete-internet-gateway --internet-gateway-id "$IGW_ID" 2>/dev/null || true
           fi
         fi
+        set -e
       continue-on-error: true
