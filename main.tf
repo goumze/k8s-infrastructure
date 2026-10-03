@@ -57,56 +57,40 @@ resource "aws_subnet" "subnet_3" {
   map_public_ip_on_launch = true
 }
 
-# module "eks" {
-#   source  = "terraform-aws-modules/eks/aws"
-#   version = "~> 21.0"
+module "eks" {
+  source  = "terraform-aws-modules/eks/aws"
+  version = "~> 21.0"
 
-#   name               = "k8s-aws-agentic-cluster"
-#   kubernetes_version = "1.33"
+  name               = "k8s-aws-agentic-cluster"
+  kubernetes_version = "1.33"
 
-#   endpoint_public_access = true
+  endpoint_public_access = true
 
-#   addons = {
-#     coredns = {
-#       most_recent = true
-#     }
-#     kube-proxy = {
-#       most_recent = true
-#     }
-#     vpc-cni = {
-#       most_recent = true
-#     }
-#   }
+  addons = {
+    coredns = {
+      most_recent = true
+    }
+    kube-proxy = {
+      most_recent = true
+    }
+    vpc-cni = {
+      most_recent = true
+    }
+  }
 
-#   vpc_id                   = aws_vpc.main.id
-#   subnet_ids               = [aws_subnet.subnet_1.id, aws_subnet.subnet_2.id, aws_subnet.subnet_3.id]
-#   control_plane_subnet_ids = [aws_subnet.subnet_1.id, aws_subnet.subnet_2.id, aws_subnet.subnet_3.id]
+  vpc_id                   = aws_vpc.main.id
+  subnet_ids               = [aws_subnet.subnet_1.id, aws_subnet.subnet_2.id, aws_subnet.subnet_3.id]
+  control_plane_subnet_ids = [aws_subnet.subnet_1.id, aws_subnet.subnet_2.id, aws_subnet.subnet_3.id]
 
-#   eks_managed_node_groups = {
-#     green = {
-#       ami_type       = "AL2023_x86_64_STANDARD"
-#       instance_types = ["m5.xlarge"]
+  eks_managed_node_groups = {
+    green = {
+      ami_type       = "AL2023_x86_64_STANDARD"
+      instance_types = ["a1.xlarge"]
 
-#       min_size     = 1
-#       max_size     = 1
-#       desired_size = 1
-#     }
-#   }
-# }
-
-module "fargate_eks_profile" {
-  source = "terraform-aws-modules/eks/aws//modules/fargate-profile"
-
-  name         = "k8s-cls-fargate-profile"
-  cluster_name = "k8s-aws-agentic-cluster"
-
-  subnet_ids = [aws_subnet.subnet_1.id, aws_subnet.subnet_2.id, aws_subnet.subnet_3.id]
-  selectors = [{
-    namespace = "kube-system"
-  }]
-
-  tags = {
-    Environment = "dev"
-    Terraform   = "true"
+      min_size     = 1
+      max_size     = 1
+      desired_size = 1
+    }
   }
 }
+

@@ -36,11 +36,11 @@ jobs:
       run: terraform plan
 
     #Reapplying Terraform changes after CW
-    # - name: Terraform Apply
-    #   if: github.ref == 'refs/heads/main'
-    #   run: terraform apply -auto-approve
+    - name: Terraform Apply
+      if: github.ref == 'refs/heads/main'
+      run: terraform apply -auto-approve
 
     #Run destroy pipeline, for the main branch
-    - name: Terraform Destroy
-      if: github.ref == 'refs/heads/main'
-      run: terraform destroy -auto-approve
+    # - name: Terraform Destroy
+    #   if: github.ref == 'refs/heads/main'
+    #   run: terraform destroy -auto-approve
