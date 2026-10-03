@@ -35,7 +35,7 @@ jobs:
     - name: Terraform Plan
       run: terraform plan
 
-    #Reapplying Terraform changes
+    #Reapplying Terraform changes after CW
     - name: Terraform Apply
       if: github.ref == 'refs/heads/main'
       run: terraform apply -auto-approve
