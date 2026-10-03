@@ -3,6 +3,7 @@ data "aws_availability_zones" "available" {}
 resource "aws_vpc" "main" {
   cidr_block           = "10.0.0.0/16"
   enable_dns_hostnames = true
+  enable_dns_support   = true
 
   tags = {
     Name = "main-vpc"
@@ -55,7 +56,8 @@ module "eks" {
   name               = "k8s-agentic-ai-cluster"
   kubernetes_version = "1.33"
 
-  endpoint_public_access = true
+  endpoint_public_access  = true
+  endpoint_private_access = true
 
   addons = {
     coredns = {
