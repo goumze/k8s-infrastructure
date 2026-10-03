@@ -15,7 +15,7 @@ resource "aws_subnet" "public_subnet" {
  vpc_id                  = aws_vpc.main.id
  cidr_block              = cidrsubnet(aws_vpc.main.cidr_block, 8, count.index)
  availability_zone       = data.aws_availability_zones.available.names[count.index]
- map_public_ip_on_launch = true
+ map_public_ip_on_launch = false
 
  tags = {
    Name = "public-subnet-${count.index}"
@@ -25,6 +25,10 @@ resource "aws_subnet" "public_subnet" {
 
 resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
+  
+  # Ensure EKS and all nodes are destroyed before detaching IGW
+  depends_on = [module.eks]
+  
   tags = {
     Name = "main-internet-gateway"
   }
@@ -47,6 +51,8 @@ resource "aws_route_table_association" "subnet_association" {
  count          = 2
  subnet_id      = aws_subnet.public_subnet.*.id[count.index]
  route_table_id = aws_route_table.public.id
+ 
+ depends_on = [module.eks]
 }
 
 module "eks" {
