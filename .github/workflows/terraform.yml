@@ -44,7 +44,13 @@ jobs:
     # Destroy node groups first to avoid ResourceInUseException
     - name: Terraform Destroy Node Groups
       if: github.ref == 'refs/heads/main'
-      run: terraform destroy -target='module.eks' -auto-approve
+      run: terraform destroy -target='aws_eks_node_group.workers' -auto-approve
+      continue-on-error: true
+    
+    # Wait a bit for node groups to fully terminate
+    - name: Wait for Node Groups to Terminate
+      if: github.ref == 'refs/heads/main'
+      run: sleep 30
     
     # Then destroy remaining resources
     - name: Terraform Destroy All Resources
