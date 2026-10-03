@@ -65,9 +65,6 @@ module "eks" {
   endpoint_public_access  = true
   endpoint_private_access = true
 
-  # Force detach policies to allow proper cleanup during destroy
-  cluster_ip_family = "ipv4"
-  
   addons = {
     coredns = {
       most_recent = true
