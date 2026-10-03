@@ -65,6 +65,9 @@ module "eks" {
   endpoint_public_access  = true
   endpoint_private_access = true
 
+  # Force detach policies to allow proper cleanup during destroy
+  cluster_ip_family = "ipv4"
+  
   addons = {
     coredns = {
       most_recent = true
@@ -89,6 +92,14 @@ module "eks" {
       min_size     = 1
       max_size     = 1
       desired_size = 1
+      
+      # Allow proper termination during destroy
+      tags = {
+        Name = "eks-node-green"
+      }
+      
+      # Disable termination protection to allow clean shutdown
+      disable_api_termination = false
     }
   }
 }
