@@ -97,7 +97,7 @@ resource "aws_subnet" "subnet_3" {
 module "fargate_eks_profile" {
   source = "terraform-aws-modules/eks/aws//modules/fargate-profile"
 
-  name         = "k8s-aws-agentic-cluster-fargate-profile"
+  name         = "k8s-cls-fargate-profile"
   cluster_name = "k8s-aws-agentic-cluster"
 
   subnet_ids = [aws_subnet.subnet_1.id, aws_subnet.subnet_2.id, aws_subnet.subnet_3.id]
