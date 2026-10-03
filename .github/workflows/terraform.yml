@@ -48,6 +48,30 @@ jobs:
       run: terraform destroy -target='module.eks.aws_eks_node_group.this["green"]' -auto-approve
       continue-on-error: true
     
+    # Force delete node groups via AWS CLI if they still exist
+    - name: Force Delete Node Groups via AWS CLI
+      if: github.ref == 'refs/heads/main'
+      run: |
+        set +e
+        CLUSTER_NAME="k8s-agentic-ai-cluster"
+        echo "Checking for node groups in cluster: $CLUSTER_NAME"
+        
+        # List all node groups
+        NODE_GROUPS=$(aws eks list-nodegroups --cluster-name "$CLUSTER_NAME" --query 'nodegroups[]' --output text 2>/dev/null)
+        
+        if [ -n "$NODE_GROUPS" ] && [ "$NODE_GROUPS" != "None" ]; then
+          echo "Found node groups: $NODE_GROUPS"
+          for ng in $NODE_GROUPS; do
+            echo "Deleting node group: $ng"
+            aws eks delete-nodegroup --cluster-name "$CLUSTER_NAME" --nodegroup-name "$ng" 2>/dev/null || true
+          done
+          echo "Node groups deletion initiated via AWS CLI"
+        else
+          echo "No node groups found"
+        fi
+        set -e
+      continue-on-error: true
+    
     # Wait for EC2 instances to terminate (3 minutes)
     - name: Wait for EC2 Instances to Terminate
       if: github.ref == 'refs/heads/main'
@@ -70,6 +94,30 @@ jobs:
             sleep 60
           fi
         fi
+        set -e
+      continue-on-error: true
+    
+    # Verify node groups are deleted before destroying cluster
+    - name: Verify Node Groups Deleted
+      if: github.ref == 'refs/heads/main'
+      run: |
+        set +e
+        CLUSTER_NAME="k8s-agentic-ai-cluster"
+        max_attempts=10
+        attempt=0
+        
+        while [ $attempt -lt $max_attempts ]; do
+          NODE_GROUPS=$(aws eks list-nodegroups --cluster-name "$CLUSTER_NAME" --query 'nodegroups[]' --output text 2>/dev/null)
+          if [ -z "$NODE_GROUPS" ] || [ "$NODE_GROUPS" = "None" ]; then
+            echo "✓ All node groups have been deleted successfully"
+            exit 0
+          fi
+          echo "Attempt $((attempt+1))/$max_attempts: Node groups still exist: $NODE_GROUPS"
+          sleep 30
+          attempt=$((attempt+1))
+        done
+        
+        echo "⚠ Warning: Node groups still exist after waiting, proceeding with terraform destroy anyway"
         set -e
       continue-on-error: true
     
