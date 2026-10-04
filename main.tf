@@ -199,8 +199,8 @@ module "eks" {
   # Managed Node Groups
   eks_managed_node_groups = {
     green = {
-      name            = "k8s-agentic-ai-node-group-green"
-      use_name_prefix = true
+      name            = "k8s-nodes"
+      use_name_prefix = false
       
       ami_type       = "AL2_x86_64"
       capacity_type  = "ON_DEMAND"
