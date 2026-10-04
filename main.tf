@@ -158,19 +158,22 @@ module "eks" {
   cluster_name    = "k8s-agentic-ai-cluster"
   cluster_version = "1.31"
 
+  # Cluster endpoint access
   cluster_endpoint_public_access  = true
   cluster_endpoint_private_access = true
 
-  vpc_id     = aws_vpc.main.id
-  subnet_ids = [
+  # Networking
+  vpc_id             = aws_vpc.main.id
+  subnet_ids         = [
     aws_subnet.public_1.id,
     aws_subnet.public_2.id,
     aws_subnet.public_3.id
   ]
-
-  # Control plane security group
-  create_cluster_security_group = true
-  cluster_security_group_name   = "k8s-agentic-ai-cluster-sg"
+  control_plane_subnet_ids = [
+    aws_subnet.public_1.id,
+    aws_subnet.public_2.id,
+    aws_subnet.public_3.id
+  ]
 
   # Cluster addons
   cluster_addons = {
