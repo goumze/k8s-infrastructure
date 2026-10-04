@@ -90,10 +90,10 @@ resource "aws_route_table_association" "public_3" {
   route_table_id = aws_route_table.public.id
 }
 
-# Security Group for EKS Cluster
-resource "aws_security_group" "eks_cluster" {
-  name        = "k8s-agentic-ai-eks-cluster-sg"
-  description = "Security group for EKS cluster"
+# Security Group for EKS Cluster Control Plane
+resource "aws_security_group" "cluster_sg" {
+  name        = "k8s-agentic-ai-cluster-sg"
+  description = "Security group for EKS cluster control plane"
   vpc_id      = aws_vpc.main.id
 
   egress {
@@ -104,28 +104,46 @@ resource "aws_security_group" "eks_cluster" {
   }
 
   tags = {
-    Name = "k8s-agentic-ai-eks-cluster-sg"
+    Name = "k8s-agentic-ai-cluster-sg"
   }
 }
 
 # Security Group for Worker Nodes
-resource "aws_security_group" "eks_nodes" {
-  name        = "k8s-agentic-ai-eks-nodes-sg"
+resource "aws_security_group" "node_sg" {
+  name        = "k8s-agentic-ai-node-sg"
   description = "Security group for EKS worker nodes"
   vpc_id      = aws_vpc.main.id
+
+  ingress {
+    from_port   = 0
+    to_port     = 65535
+    protocol    = "tcp"
+    self        = true
+    description = "Node to node TCP"
+  }
 
   ingress {
     from_port       = 0
     to_port         = 65535
     protocol        = "tcp"
-    security_groups = [aws_security_group.eks_cluster.id]
+    security_groups = [aws_security_group.cluster_sg.id]
+    description     = "Cluster to node TCP"
   }
 
   ingress {
     from_port   = 0
     to_port     = 65535
     protocol    = "udp"
-    cidr_blocks = ["10.0.0.0/16"]
+    self        = true
+    description = "Node to node UDP"
+  }
+
+  ingress {
+    from_port   = 1025
+    to_port     = 65535
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "Kubelet API"
   }
 
   egress {
@@ -136,122 +154,239 @@ resource "aws_security_group" "eks_nodes" {
   }
 
   tags = {
-    Name = "k8s-agentic-ai-eks-nodes-sg"
+    Name = "k8s-agentic-ai-node-sg"
   }
 }
 
-# Allow nodes to communicate with each other
-resource "aws_security_group_rule" "eks_nodes_self" {
-  type              = "ingress"
-  from_port         = 0
-  to_port           = 65535
-  protocol          = "-1"
-  security_group_id = aws_security_group.eks_nodes.id
-  source_security_group_id = aws_security_group.eks_nodes.id
+# Allow cluster to ingress from nodes
+resource "aws_security_group_rule" "cluster_ingress_node_https" {
+  type                     = "ingress"
+  from_port                = 443
+  to_port                  = 443
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.cluster_sg.id
+  source_security_group_id = aws_security_group.node_sg.id
 }
 
-# EKS Cluster Module
-module "eks" {
-  source  = "terraform-aws-modules/eks/aws"
-  version = "~> 21.0"
+# ============================================================================
+# IAM ROLES
+# ============================================================================
 
-  name               = "k8s-agentic-ai-cluster"
-  kubernetes_version = "1.31"
+# EKS Cluster IAM Role
+resource "aws_iam_role" "cluster_role" {
+  name = "k8s-agentic-ai-cluster-role"
 
-  # Prevent dynamic evaluation issues in node group submodule
-  # by explicitly setting partition (prevents data source from being queried)
-  partition = "aws"
-
-  # Cluster endpoint access
-  endpoint_public_access  = true
-  endpoint_private_access = true
-
-  # Networking
-  vpc_id             = aws_vpc.main.id
-  subnet_ids         = [
-    aws_subnet.public_1.id,
-    aws_subnet.public_2.id,
-    aws_subnet.public_3.id
-  ]
-  control_plane_subnet_ids = [
-    aws_subnet.public_1.id,
-    aws_subnet.public_2.id,
-    aws_subnet.public_3.id
-  ]
-
-  # Cluster addons
-  addons = {
-    coredns = {
-      most_recent = true
-    }
-    eks-pod-identity-agent = {
-      most_recent = true
-    }
-    kube-proxy = {
-      most_recent = true
-    }
-    vpc-cni = {
-      most_recent = true
-      configuration_values = jsonencode({
-        env = {
-          ASSIGN_IPV4_ON_LAUNCH = "true"
-        }
-      })
-    }
-  }
-
-  # Managed Node Groups
-  eks_managed_node_groups = {
-    green = {
-      name            = "k8s-nodes"
-      use_name_prefix = false
-      
-      ami_type       = "AL2_x86_64"
-      capacity_type  = "ON_DEMAND"
-      instance_types = ["t3.xlarge"]
-
-      min_size     = 1
-      max_size     = 3
-      desired_size = 2
-
-      # Disk configuration
-      block_device_mappings = {
-        xvda = {
-          device_name = "/dev/xvda"
-          ebs = {
-            volume_size           = 100
-            volume_type           = "gp3"
-            delete_on_termination = true
-            encrypted             = true
-          }
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "eks.amazonaws.com"
         }
       }
+    ]
+  })
 
-      # IAM role policies
-      iam_role_additional_policies = {
-        AmazonSSMManagedInstanceCore = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
-        CloudWatchAgentServerPolicy  = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
-      }
+  tags = {
+    Name = "k8s-agentic-ai-cluster-role"
+  }
+}
 
-      # Tags
-      tags = {
-        Environment = "production"
-        NodeGroup   = "green"
+resource "aws_iam_role_policy_attachment" "cluster_policy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
+  role       = aws_iam_role.cluster_role.name
+}
+
+resource "aws_iam_role_policy_attachment" "cluster_vpc_resource_controller" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSVPCResourceController"
+  role       = aws_iam_role.cluster_role.name
+}
+
+# EKS Node Group IAM Role
+resource "aws_iam_role" "node_role" {
+  name = "k8s-agentic-ai-node-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
       }
-    }
+    ]
+  })
+
+  tags = {
+    Name = "k8s-agentic-ai-node-role"
+  }
+}
+
+resource "aws_iam_role_policy_attachment" "node_policy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+  role       = aws_iam_role.node_role.name
+}
+
+resource "aws_iam_role_policy_attachment" "node_cni_policy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+  role       = aws_iam_role.node_role.name
+}
+
+resource "aws_iam_role_policy_attachment" "node_registry_policy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+  role       = aws_iam_role.node_role.name
+}
+
+resource "aws_iam_role_policy_attachment" "node_ssm_policy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+  role       = aws_iam_role.node_role.name
+}
+
+# ============================================================================
+# EKS CLUSTER
+# ============================================================================
+
+resource "aws_eks_cluster" "main" {
+  name     = "k8s-agentic-ai-cluster"
+  version  = "1.31"
+  role_arn = aws_iam_role.cluster_role.arn
+
+  vpc_config {
+    subnet_ids              = [aws_subnet.public_1.id, aws_subnet.public_2.id, aws_subnet.public_3.id]
+    security_group_ids      = [aws_security_group.cluster_sg.id]
+    endpoint_private_access = true
+    endpoint_public_access  = true
   }
 
-  # Cluster tags
+  enabled_cluster_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
+
   tags = {
     Name        = "k8s-agentic-ai-cluster"
     Environment = "production"
-    ManagedBy   = "Terraform"
   }
 
   depends_on = [
-    aws_internet_gateway.main,
-    aws_route_table_association.public_1,
-    aws_route_table_association.public_2,
-    aws_route_table_association.public_3
+    aws_iam_role_policy_attachment.cluster_policy,
+    aws_iam_role_policy_attachment.cluster_vpc_resource_controller
   ]
+}
+
+# ============================================================================
+# EKS NODE GROUP
+# ============================================================================
+
+resource "aws_eks_node_group" "main" {
+  cluster_name    = aws_eks_cluster.main.name
+  node_group_name = "k8s-agentic-ai-node-group"
+  node_role_arn   = aws_iam_role.node_role.arn
+  subnet_ids      = [aws_subnet.public_1.id, aws_subnet.public_2.id, aws_subnet.public_3.id]
+
+  scaling_config {
+    desired_size = 2
+    max_size     = 3
+    min_size     = 1
+  }
+
+  update_config {
+    max_unavailable = 1
+  }
+
+  ami_type       = "AL2_x86_64"
+  instance_types = ["t3.xlarge"]
+  capacity_type  = "ON_DEMAND"
+  disk_size      = 100
+
+  tags = {
+    Name        = "k8s-agentic-ai-node-group"
+    Environment = "production"
+  }
+
+  depends_on = [
+    aws_iam_role_policy_attachment.node_policy,
+    aws_iam_role_policy_attachment.node_cni_policy,
+    aws_iam_role_policy_attachment.node_registry_policy,
+    aws_iam_role_policy_attachment.node_ssm_policy
+  ]
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# ============================================================================
+# EKS ADDONS
+# ============================================================================
+
+resource "aws_eks_addon" "vpc_cni" {
+  cluster_name             = aws_eks_cluster.main.name
+  addon_name               = "vpc-cni"
+  addon_version            = "v1.18.1-eksbuild.1"
+  resolve_conflicts_on_create = "OVERWRITE"
+
+  tags = {
+    Name = "k8s-vpc-cni-addon"
+  }
+
+  depends_on = [aws_eks_node_group.main]
+}
+
+resource "aws_eks_addon" "coredns" {
+  cluster_name             = aws_eks_cluster.main.name
+  addon_name               = "coredns"
+  addon_version            = "v1.11.1-eksbuild.2"
+  resolve_conflicts_on_create = "OVERWRITE"
+
+  tags = {
+    Name = "k8s-coredns-addon"
+  }
+
+  depends_on = [aws_eks_node_group.main]
+}
+
+resource "aws_eks_addon" "kube_proxy" {
+  cluster_name             = aws_eks_cluster.main.name
+  addon_name               = "kube-proxy"
+  addon_version            = "v1.31.0-eksbuild.1"
+  resolve_conflicts_on_create = "OVERWRITE"
+
+  tags = {
+    Name = "k8s-kube-proxy-addon"
+  }
+
+  depends_on = [aws_eks_node_group.main]
+}
+
+resource "aws_eks_addon" "ebs_csi" {
+  cluster_name             = aws_eks_cluster.main.name
+  addon_name               = "aws-ebs-csi-driver"
+  addon_version            = "v1.24.0-eksbuild.1"
+  resolve_conflicts_on_create = "OVERWRITE"
+
+  tags = {
+    Name = "k8s-ebs-csi-addon"
+  }
+
+  depends_on = [aws_eks_node_group.main]
+}
+
+# ============================================================================
+# OIDC PROVIDER FOR IRSA (IAM Roles for Service Accounts)
+# ============================================================================
+
+data "tls_certificate" "cluster" {
+  url = aws_eks_cluster.main.identity[0].oidc[0].issuer
+}
+
+resource "aws_iam_openid_connect_provider" "cluster" {
+  client_id_list  = ["sts.amazonaws.com"]
+  thumbprint_list = [data.tls_certificate.cluster.certificates[0].sha1_fingerprint]
+  url             = aws_eks_cluster.main.identity[0].oidc[0].issuer
+
+  tags = {
+    Name = "k8s-agentic-ai-irsa"
+  }
 }

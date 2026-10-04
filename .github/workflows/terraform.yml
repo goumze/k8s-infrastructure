@@ -33,11 +33,11 @@ jobs:
       run: terraform init
 
     - name: Terraform Plan
-      run: terraform plan -parallelism=1 -out=tfplan
+      run: terraform plan -out=tfplan
 
     - name: Terraform Apply
       if: github.ref == 'refs/heads/main'
-      run: terraform apply -parallelism=1 -auto-approve tfplan
+      run: terraform apply -auto-approve tfplan
     
     - name: Get Cluster Information
       if: github.ref == 'refs/heads/main'
