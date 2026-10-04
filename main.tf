@@ -202,6 +202,9 @@ module "eks" {
       name            = "k8s-nodes"
       use_name_prefix = false
       
+      partition = data.aws_partition.current.partition
+      account_id = data.aws_caller_identity.current.account_id
+      
       ami_type       = "AL2_x86_64"
       capacity_type  = "ON_DEMAND"
       instance_types = ["t3.xlarge"]
