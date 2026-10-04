@@ -158,9 +158,9 @@ module "eks" {
   name               = "k8s-agentic-ai-cluster"
   kubernetes_version = "1.31"
 
-  # Account and partition info (required for plan-time evaluation)
-  # Prevent dynamic evaluation of internal node group data sources
-  # Note: Not standard module inputs, but passed through to submodules
+  # Prevent dynamic evaluation issues in node group submodule
+  # by explicitly setting partition (prevents data source from being queried)
+  partition = "aws"
 
   # Cluster endpoint access
   endpoint_public_access  = true
