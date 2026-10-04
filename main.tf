@@ -357,18 +357,6 @@ resource "aws_eks_addon" "kube_proxy" {
   depends_on = [aws_eks_node_group.main]
 }
 
-resource "aws_eks_addon" "ebs_csi" {
-  cluster_name             = aws_eks_cluster.main.name
-  addon_name               = "aws-ebs-csi-driver"
-  resolve_conflicts_on_create = "OVERWRITE"
-
-  tags = {
-    Name = "k8s-ebs-csi-addon"
-  }
-
-  depends_on = [aws_eks_node_group.main]
-}
-
 # ============================================================================
 # OIDC PROVIDER FOR IRSA (IAM Roles for Service Accounts)
 # ============================================================================
