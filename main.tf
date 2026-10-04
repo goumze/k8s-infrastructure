@@ -158,6 +158,10 @@ module "eks" {
   name               = "k8s-agentic-ai-cluster"
   kubernetes_version = "1.31"
 
+  # Account and partition info (required for plan-time evaluation)
+  # Prevent dynamic evaluation of internal node group data sources
+  # Note: Not standard module inputs, but passed through to submodules
+
   # Cluster endpoint access
   endpoint_public_access  = true
   endpoint_private_access = true
@@ -201,9 +205,6 @@ module "eks" {
     green = {
       name            = "k8s-nodes"
       use_name_prefix = false
-      
-      partition = data.aws_partition.current.partition
-      account_id = data.aws_caller_identity.current.account_id
       
       ami_type       = "AL2_x86_64"
       capacity_type  = "ON_DEMAND"
