@@ -155,12 +155,12 @@ module "eks" {
   source  = "terraform-aws-modules/eks/aws"
   version = "~> 21.0"
 
-  cluster_name    = "k8s-agentic-ai-cluster"
-  cluster_version = "1.31"
+  name               = "k8s-agentic-ai-cluster"
+  kubernetes_version = "1.31"
 
   # Cluster endpoint access
-  cluster_endpoint_public_access  = true
-  cluster_endpoint_private_access = true
+  endpoint_public_access  = true
+  endpoint_private_access = true
 
   # Networking
   vpc_id             = aws_vpc.main.id
@@ -176,9 +176,8 @@ module "eks" {
   ]
 
   # Cluster addons
-  cluster_addons = {
+  addons = {
     coredns = {
-      preserve    = true
       most_recent = true
     }
     eks-pod-identity-agent = {
