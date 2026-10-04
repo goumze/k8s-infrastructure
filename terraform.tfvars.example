@@ -1,0 +1,44 @@
+# Copy this file to terraform.tfvars and customize values as needed
+# cp terraform.tfvars.example terraform.tfvars
+
+# AWS Region for deployment
+aws_region = "ap-south-1"
+
+# Environment name
+environment = "production"
+
+# Project name for resource naming
+project_name = "k8s-agentic-ai"
+
+# VPC CIDR block
+vpc_cidr = "10.0.0.0/16"
+
+# Kubernetes version
+cluster_version = "1.31"
+
+# Node group sizing
+node_group_desired_size = 2
+node_group_min_size     = 1
+node_group_max_size     = 3
+
+# EC2 instance type for nodes
+# Options: t3.large, t3.xlarge, t3.2xlarge, m5.large, m5.xlarge, etc.
+node_instance_type = "t3.xlarge"
+
+# EBS volume size for nodes (GB)
+node_volume_size = 100
+
+# Enable cluster autoscaling
+enable_cluster_autoscaling = true
+
+# Enable NAT Gateway for private subnets
+enable_nat_gateway = false
+
+# Custom tags
+tags = {
+  Environment = "production"
+  Project     = "k8s-agentic-ai"
+  ManagedBy   = "Terraform"
+  Team        = "DevOps"
+  CostCenter  = "Engineering"
+}

@@ -33,148 +33,28 @@ jobs:
       run: terraform init
 
     - name: Terraform Plan
-      run: terraform plan
+      run: terraform plan -out=tfplan
 
-    # Reapplying Terraform changes
-    # - name: Terraform Apply
-    #   if: github.ref == 'refs/heads/main'
-    #   run: terraform apply -auto-approve
-
-
-    # Run destroy pipeline, for the main branch for destroying resources
-    # STEP 1: Force terminate EC2 instances first before destroying node group
-    - name: Force Terminate EC2 Instances from Node Group
+    - name: Terraform Apply
+      if: github.ref == 'refs/heads/main'
+      run: terraform apply -auto-approve tfplan
+    
+    - name: Get Cluster Information
       if: github.ref == 'refs/heads/main'
       run: |
-        set +e
-        CLUSTER_NAME="k8s-agentic-ai-cluster"
-        echo "Getting EC2 instances from node group..."
-        
-        # Get all instance IDs from the node group
-        INSTANCE_IDS=$(aws ec2 describe-instances \
-          --filters "Name=tag:eks:nodegroup-name,Values=green" "Name=instance-state-name,Values=running" \
-          --query 'Reservations[].Instances[].InstanceId' \
-          --output text 2>/dev/null)
-        
-        if [ -n "$INSTANCE_IDS" ] && [ "$INSTANCE_IDS" != "None" ]; then
-          echo "Found instances: $INSTANCE_IDS"
-          echo "Force terminating instances..."
-          for instance_id in $INSTANCE_IDS; do
-            echo "Terminating instance: $instance_id"
-            aws ec2 terminate-instances --instance-ids "$instance_id" 2>/dev/null || true
-          done
-          echo "Waiting 30 seconds for instance termination..."
-          sleep 30
-        else
-          echo "No running instances found in node group"
-        fi
-        set -e
-      continue-on-error: true
+        echo "=== EKS Cluster Created Successfully ==="
+        terraform output -json cluster_summary
+        echo ""
+        echo "=== Configure kubectl ==="
+        terraform output -raw configure_kubectl
+        echo ""
+        echo "=== Cluster Details ==="
+        echo "Cluster Name: $(terraform output -raw cluster_name)"
+        echo "Cluster Endpoint: $(terraform output -raw cluster_endpoint)"
+        echo "Cluster Version: $(terraform output -raw cluster_version)"
+        echo "Region: ap-south-1"
     
-    # STEP 2: Destroy node group via Terraform
-    - name: Terraform Destroy Node Groups
-      if: github.ref == 'refs/heads/main'
-      run: terraform destroy -target='module.eks.aws_eks_node_group.this["green"]' -auto-approve
-      continue-on-error: true
-    
-    # STEP 3: Force delete node groups via AWS CLI if they still exist
-    - name: Force Delete Node Groups via AWS CLI
-      if: github.ref == 'refs/heads/main'
-      run: |
-        set +e
-        CLUSTER_NAME="k8s-agentic-ai-cluster"
-        echo "Checking for node groups in cluster: $CLUSTER_NAME"
-        
-        # List all node groups
-        NODE_GROUPS=$(aws eks list-nodegroups --cluster-name "$CLUSTER_NAME" --query 'nodegroups[]' --output text 2>/dev/null)
-        
-        if [ -n "$NODE_GROUPS" ] && [ "$NODE_GROUPS" != "None" ]; then
-          echo "Found node groups: $NODE_GROUPS"
-          for ng in $NODE_GROUPS; do
-            echo "Deleting node group: $ng"
-            aws eks delete-nodegroup --cluster-name "$CLUSTER_NAME" --nodegroup-name "$ng" 2>/dev/null || true
-          done
-          echo "Node groups deletion initiated via AWS CLI"
-        else
-          echo "No node groups found"
-        fi
-        set -e
-      continue-on-error: true
-    
-    # STEP 4: Wait for EC2 instances to terminate completely (3 minutes)
-    - name: Wait for EC2 Instances to Terminate
-      if: github.ref == 'refs/heads/main'
-      run: sleep 180
-    
-    # STEP 5: Terminate any remaining EC2 instances
-    - name: Force Terminate Remaining EC2 Instances
-      if: github.ref == 'refs/heads/main'
-      run: |
-        set +e
-        VPC_ID=$(terraform output -raw vpc_id 2>/dev/null)
-        if [ -n "$VPC_ID" ]; then
-          INSTANCE_IDS=$(aws ec2 describe-instances \
-            --filters "Name=vpc-id,Values=$VPC_ID" "Name=instance-state-name,Values=running" \
-            --query 'Reservations[].Instances[].InstanceId' \
-            --output text 2>/dev/null)
-          if [ -n "$INSTANCE_IDS" ]; then
-            echo "Terminating instances: $INSTANCE_IDS"
-            aws ec2 terminate-instances --instance-ids $INSTANCE_IDS 2>/dev/null || true
-            sleep 60
-          fi
-        fi
-        set -e
-      continue-on-error: true
-    
-    # STEP 6: Verify node groups are deleted before destroying cluster
-    - name: Verify Node Groups Deleted
-      if: github.ref == 'refs/heads/main'
-      run: |
-        set +e
-        CLUSTER_NAME="k8s-agentic-ai-cluster"
-        max_attempts=10
-        attempt=0
-        
-        while [ $attempt -lt $max_attempts ]; do
-          NODE_GROUPS=$(aws eks list-nodegroups --cluster-name "$CLUSTER_NAME" --query 'nodegroups[]' --output text 2>/dev/null)
-          if [ -z "$NODE_GROUPS" ] || [ "$NODE_GROUPS" = "None" ]; then
-            echo "✓ All node groups have been deleted successfully"
-            exit 0
-          fi
-          echo "Attempt $((attempt+1))/$max_attempts: Node groups still exist: $NODE_GROUPS"
-          sleep 30
-          attempt=$((attempt+1))
-        done
-        
-        echo "⚠ Warning: Node groups still exist after waiting, proceeding with terraform destroy anyway"
-        set -e
-      continue-on-error: true
-    
-    # STEP 7: Destroy all remaining resources
-    - name: Terraform Destroy All Resources
-      if: github.ref == 'refs/heads/main'
-      run: terraform destroy -auto-approve
-      continue-on-error: true
-    
-    # STEP 8: Final cleanup - force detach IGW if needed
-    - name: Force Cleanup Internet Gateway
-      if: github.ref == 'refs/heads/main'
-      run: |
-        set +e
-        VPC_ID=$(terraform output -raw vpc_id 2>/dev/null)
-        if [ -n "$VPC_ID" ]; then
-          echo "VPC ID: $VPC_ID"
-          IGW_ID=$(aws ec2 describe-internet-gateways \
-            --filters "Name=attachment.vpc-id,Values=$VPC_ID" \
-            --query 'InternetGateways[0].InternetGatewayId' \
-            --output text 2>/dev/null)
-          if [ -n "$IGW_ID" ] && [ "$IGW_ID" != "None" ]; then
-            echo "Detaching IGW: $IGW_ID from VPC: $VPC_ID"
-            aws ec2 detach-internet-gateway --internet-gateway-id "$IGW_ID" --vpc-id "$VPC_ID" 2>/dev/null || true
-            sleep 30
-            echo "Deleting IGW: $IGW_ID"
-            aws ec2 delete-internet-gateway --internet-gateway-id "$IGW_ID" 2>/dev/null || true
-          fi
-        fi
-        set -e
-      continue-on-error: true
+    # Cleanup terraform plan file
+    - name: Cleanup
+      if: always()
+      run: rm -f tfplan

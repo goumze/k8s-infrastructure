@@ -1,7 +1,9 @@
 terraform {
   backend "s3" {
-    bucket = "goutam-terraform-state-251850081286-ap-south-1-an"
-    key    = "agentic_key/terraform.tfstate"
-    region = "ap-south-1"
+    bucket         = "goutam-terraform-state-251850081286-ap-south-1-an"
+    key            = "agentic_key/terraform.tfstate"
+    region         = "ap-south-1"
+    encrypt        = true
+    dynamodb_table = "terraform-locks"
   }
 }
