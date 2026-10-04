@@ -21,7 +21,6 @@ provider "aws" {
       Environment = "production"
       Project     = "k8s-agentic-ai"
       ManagedBy   = "Terraform"
-      CreatedAt   = timestamp()
     }
   }
 }
