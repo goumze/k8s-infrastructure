@@ -43,22 +43,22 @@ jobs:
       if: github.ref == 'refs/heads/main'
       run: terraform destroy -auto-approve
     
-    - name: Get Cluster Information
-      if: github.ref == 'refs/heads/main'
-      run: |
-        echo "=== EKS Cluster Created Successfully ==="
-        terraform output -json cluster_summary
-        echo ""
-        echo "=== Configure kubectl ==="
-        terraform output -raw configure_kubectl
-        echo ""
-        echo "=== Cluster Details ==="
-        echo "Cluster Name: $(terraform output -raw cluster_name)"
-        echo "Cluster Endpoint: $(terraform output -raw cluster_endpoint)"
-        echo "Cluster Version: $(terraform output -raw cluster_version)"
-        echo "Region: ap-south-1"
+    # - name: Get Cluster Information
+    #   if: github.ref == 'refs/heads/main'
+    #   run: |
+    #     echo "=== EKS Cluster Created Successfully ==="
+    #     terraform output -json cluster_summary
+    #     echo ""
+    #     echo "=== Configure kubectl ==="
+    #     terraform output -raw configure_kubectl
+    #     echo ""
+    #     echo "=== Cluster Details ==="
+    #     echo "Cluster Name: $(terraform output -raw cluster_name)"
+    #     echo "Cluster Endpoint: $(terraform output -raw cluster_endpoint)"
+    #     echo "Cluster Version: $(terraform output -raw cluster_version)"
+    #     echo "Region: ap-south-1"
     
-    # Cleanup terraform plan file
-    - name: Cleanup
-      if: always()
-      run: rm -f tfplan
+    # # Cleanup terraform plan file
+    # - name: Cleanup
+    #   if: always()
+    #   run: rm -f tfplan
