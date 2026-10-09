@@ -42,23 +42,68 @@ jobs:
     - name: Terraform Destroy
       if: github.ref == 'refs/heads/main'
       run: terraform destroy -auto-approve
+
+    - name: Get Cluster Information
+      if: github.ref == 'refs/heads/main'
+      run: |
+        # Already in k8s-infrastructure directory from terraform init
+        
+        # Disable terraform logging
+        export TF_LOG=""
+        export TF_LOG_PATH=""
+        export TF_INPUT=false
+        
+        # Get JSON output directly without sed filtering
+        echo "Retrieving terraform outputs..."
+        OUTPUTS=$(terraform output -json 2>&1)
+        
+        # Show raw output for debugging
+        echo "Raw terraform output:"
+        echo "$OUTPUTS" | head -c 200
+        echo ""
+        echo ""
+        
+        # Validate JSON with better error handling
+        if ! echo "$OUTPUTS" | jq empty 2>&1; then
+          echo "❌ terraform output is not valid JSON"
+          echo "Full output:"
+          echo "$OUTPUTS"
+          exit 1
+        fi
+        
+        # Extract cluster name and suffix safely using jq
+        CLUSTER_NAME=$(echo "$OUTPUTS" | jq -r '.cluster_name.value // empty' 2>&1)
+        CLUSTER_SUFFIX=$(echo "$OUTPUTS" | jq -r '.cluster_suffix.value // empty' 2>&1)
+        
+        # Validate extraction
+        if [ -z "$CLUSTER_NAME" ] || [ "$CLUSTER_NAME" == "null" ]; then
+          echo "❌ Failed to extract cluster_name from terraform output"
+          echo "Available keys:"
+          echo "$OUTPUTS" | jq 'keys' 2>&1
+          exit 1
+        fi
+        
+        # Write outputs
+        echo "cluster_name=$CLUSTER_NAME" >> $GITHUB_OUTPUT
+        echo "cluster_suffix=$CLUSTER_SUFFIX" >> $GITHUB_OUTPUT
+        
+        echo "✅ Cluster Name: $CLUSTER_NAME"
+        echo "✅ Cluster Suffix: $CLUSTER_SUFFIX"
+
+    - name: Display Cluster Information
+      if: github.ref == 'refs/heads/main'
+      run: |
+        # Already in k8s-infrastructure directory from terraform init
+        echo "=== EKS Cluster Information ==="
+        echo "Cluster Name: $(terraform output -raw cluster_name 2>/dev/null || echo 'N/A')"
+        echo "Cluster Endpoint: $(terraform output -raw cluster_endpoint 2>/dev/null || echo 'N/A')"
+        echo "Cluster Version: $(terraform output -raw cluster_version 2>/dev/null || echo 'N/A')"
+        echo "Region: ap-south-1"
+        echo ""
+        echo "Configure kubectl with:"
+        terraform output -raw configure_kubectl
     
-    # - name: Get Cluster Information
-    #   if: github.ref == 'refs/heads/main'
-    #   run: |
-    #     echo "=== EKS Cluster Created Successfully ==="
-    #     terraform output -json cluster_summary
-    #     echo ""
-    #     echo "=== Configure kubectl ==="
-    #     terraform output -raw configure_kubectl
-    #     echo ""
-    #     echo "=== Cluster Details ==="
-    #     echo "Cluster Name: $(terraform output -raw cluster_name)"
-    #     echo "Cluster Endpoint: $(terraform output -raw cluster_endpoint)"
-    #     echo "Cluster Version: $(terraform output -raw cluster_version)"
-    #     echo "Region: ap-south-1"
-    
-    # # Cleanup terraform plan file
-    # - name: Cleanup
-    #   if: always()
-    #   run: rm -f tfplan
+    # Cleanup terraform plan file
+    - name: Cleanup
+      if: always()
+      run: rm -f tfplan
