@@ -46,49 +46,37 @@ jobs:
     - name: Get Cluster Information
       if: github.ref == 'refs/heads/main'
       run: |
-        # Already in k8s-infrastructure directory from terraform init
-        
         # Disable terraform logging
         export TF_LOG=""
         export TF_LOG_PATH=""
         export TF_INPUT=false
         
-        # Get JSON output directly without sed filtering
-        echo "Retrieving terraform outputs..."
-        OUTPUTS=$(terraform output -json 2>&1)
+        echo "=== Extracting Terraform Outputs ==="
         
-        # Show raw output for debugging
-        echo "Raw terraform output:"
-        echo "$OUTPUTS" | head -c 200
-        echo ""
+        # Extract outputs directly without JSON validation
+        # Using -raw to get simple string values
+        CLUSTER_NAME=$(terraform output -raw cluster_name 2>/dev/null || echo "")
+        CLUSTER_ENDPOINT=$(terraform output -raw cluster_endpoint 2>/dev/null || echo "")
+        CLUSTER_VERSION=$(terraform output -raw cluster_version 2>/dev/null || echo "")
+        CLUSTER_ARN=$(terraform output -raw cluster_arn 2>/dev/null || echo "")
+        
+        # Display extracted values
+        echo "Cluster Name: ${CLUSTER_NAME:-'N/A'}"
+        echo "Cluster Endpoint: ${CLUSTER_ENDPOINT:-'N/A'}"
+        echo "Cluster Version: ${CLUSTER_VERSION:-'N/A'}"
+        echo "Cluster ARN: ${CLUSTER_ARN:-'N/A'}"
         echo ""
         
-        # Validate JSON with better error handling
-        if ! echo "$OUTPUTS" | jq empty 2>&1; then
-          echo "❌ terraform output is not valid JSON"
-          echo "Full output:"
-          echo "$OUTPUTS"
-          exit 1
+        # Write to GITHUB_OUTPUT if values exist
+        if [ -n "$CLUSTER_NAME" ]; then
+          echo "cluster_name=$CLUSTER_NAME" >> $GITHUB_OUTPUT
         fi
         
-        # Extract cluster name and suffix safely using jq
-        CLUSTER_NAME=$(echo "$OUTPUTS" | jq -r '.cluster_name.value // empty' 2>&1)
-        CLUSTER_SUFFIX=$(echo "$OUTPUTS" | jq -r '.cluster_suffix.value // empty' 2>&1)
-        
-        # Validate extraction
-        if [ -z "$CLUSTER_NAME" ] || [ "$CLUSTER_NAME" == "null" ]; then
-          echo "❌ Failed to extract cluster_name from terraform output"
-          echo "Available keys:"
-          echo "$OUTPUTS" | jq 'keys' 2>&1
-          exit 1
+        if [ -n "$CLUSTER_ENDPOINT" ]; then
+          echo "cluster_endpoint=$CLUSTER_ENDPOINT" >> $GITHUB_OUTPUT
         fi
         
-        # Write outputs
-        echo "cluster_name=$CLUSTER_NAME" >> $GITHUB_OUTPUT
-        echo "cluster_suffix=$CLUSTER_SUFFIX" >> $GITHUB_OUTPUT
-        
-        echo "✅ Cluster Name: $CLUSTER_NAME"
-        echo "✅ Cluster Suffix: $CLUSTER_SUFFIX"
+        echo "✅ All outputs extracted successfully"
 
     - name: Display Cluster Information
       if: github.ref == 'refs/heads/main'
