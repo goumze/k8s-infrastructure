@@ -49,7 +49,7 @@ resource "aws_eks_capability" "ack" {
   delete_propagation_policy = "RETAIN"
   tags                      = var.tags
 
-  depends_on = [aws_iam_role_policy.ack_agentcore]
+  depends_on = [aws_iam_role.ack, aws_iam_role_policy.ack_agentcore]
 }
 
 resource "aws_eks_capability" "kro" {
@@ -59,6 +59,8 @@ resource "aws_eks_capability" "kro" {
   role_arn                  = aws_iam_role.kro.arn
   delete_propagation_policy = "RETAIN"
   tags                      = var.tags
+
+  depends_on = [aws_iam_role.kro]
 }
 
 
