@@ -6,7 +6,7 @@ resource "aws_subnet" "public_1" {
   map_public_ip_on_launch = true
 
   tags = {
-    Name                     = "k8s-agentic-ai-public-subnet-1a"
+    Name                     = "k8s-public-subnet-ap-south-1a"
     "kubernetes.io/role/elb" = "1"
   }
 }
@@ -18,7 +18,7 @@ resource "aws_subnet" "public_2" {
   map_public_ip_on_launch = true
 
   tags = {
-    Name                     = "k8s-agentic-ai-public-subnet-1b"
+    Name                     = "k8s-public-subnet-ap-south-1b"
     "kubernetes.io/role/elb" = "1"
   }
 }
@@ -30,7 +30,7 @@ resource "aws_subnet" "public_3" {
   map_public_ip_on_launch = true
 
   tags = {
-    Name                     = "k8s-agentic-ai-public-subnet-1c"
+    Name                     = "k8s-public-subnet-ap-south-1c"
     "kubernetes.io/role/elb" = "1"
   }
 }

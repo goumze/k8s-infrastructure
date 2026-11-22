@@ -1,3 +1,20 @@
+resource "aws_security_group" "cluster_sg" {
+  name        = "k8s-cluster-sg"
+  description = "Security group for the EKS cluster"
+  vpc_id      = aws_vpc.main.id
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "k8s-cluster-sg"
+  }
+}
+
 # Security Group for Worker Nodes
 resource "aws_security_group" "node_sg" {
   name        = "k8s-node-sg"

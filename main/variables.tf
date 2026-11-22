@@ -31,7 +31,7 @@ variable "enable_nat_gateway" {
 variable "cluster_version" {
   description = "Kubernetes cluster version"
   type        = string
-  default     = "1.31"
+  default     = "1.37"
 }
 
 variable "node_group_desired_size" {

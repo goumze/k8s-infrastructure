@@ -5,7 +5,7 @@ resource "aws_vpc" "main" {
   enable_dns_support   = true
 
   tags = {
-    Name        = "custom_vpc"
+    Name        = "k8s-custom-vpc"
     Environment = "production"
   }
 }

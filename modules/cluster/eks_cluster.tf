@@ -4,12 +4,12 @@
 
 resource "aws_eks_cluster" "main" {
   name     = "k8s-agentic-ai-cluster"
-  version  = "1.31"
-  role_arn = aws_iam_role.cluster_role.arn
+  version  = var.cluster_version
+  role_arn = var.cluster_role_arn
 
   vpc_config {
-    subnet_ids              = [aws_subnet.public_1.id, aws_subnet.public_2.id, aws_subnet.public_3.id]
-    security_group_ids      = [aws_security_group.cluster_sg.id]
+    subnet_ids              = var.subnet_ids
+    security_group_ids      = [var.cluster_security_group_id]
     endpoint_private_access = true
     endpoint_public_access  = true
   }
@@ -20,11 +20,6 @@ resource "aws_eks_cluster" "main" {
     Name        = "k8s-agentic-ai-cluster"
     Environment = "production"
   }
-
-  depends_on = [
-    aws_iam_role_policy_attachment.cluster_policy,
-    aws_iam_role_policy_attachment.cluster_vpc_resource_controller
-  ]
 }
 
 # ============================================================================
@@ -34,8 +29,8 @@ resource "aws_eks_cluster" "main" {
 resource "aws_eks_node_group" "main" {
   cluster_name    = aws_eks_cluster.main.name
   node_group_name = "k8s-node-group"
-  node_role_arn   = aws_iam_role.node_role.arn
-  subnet_ids      = [aws_subnet.public_1.id, aws_subnet.public_2.id, aws_subnet.public_3.id]
+  node_role_arn   = var.node_role_arn
+  subnet_ids      = var.subnet_ids
 
   scaling_config {
     desired_size = 2
@@ -47,7 +42,7 @@ resource "aws_eks_node_group" "main" {
     max_unavailable = 1
   }
 
-  ami_type       = "AL2_x86_64"
+  ami_type       = "AL2023_x86_64_STANDARD"
   instance_types = ["t3.xlarge"]
   capacity_type  = "ON_DEMAND"
   disk_size      = 100
@@ -56,13 +51,6 @@ resource "aws_eks_node_group" "main" {
     Name        = "k8s-node-group"
     Environment = "production"
   }
-
-  depends_on = [
-    aws_iam_role_policy_attachment.node_policy,
-    aws_iam_role_policy_attachment.node_cni_policy,
-    aws_iam_role_policy_attachment.node_registry_policy,
-    aws_iam_role_policy_attachment.node_ssm_policy
-  ]
 
   lifecycle {
     create_before_destroy = true

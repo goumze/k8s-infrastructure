@@ -75,3 +75,11 @@ resource "aws_iam_role_policy_attachment" "node_ssm_policy" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
   role       = aws_iam_role.node_role.name
 }
+
+output "cluster_role_arn" {
+  value = aws_iam_role.cluster_role.arn
+}
+
+output "node_role_arn" {
+  value = aws_iam_role.node_role.arn
+}
