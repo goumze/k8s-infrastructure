@@ -10,6 +10,10 @@ terraform {
       source  = "hashicorp/tls"
       version = ">= 4.0.0"
     }
+    kubectl = {
+      source  = "gavinbunney/kubectl"
+      version = ">= 1.14.0"
+    }
   }
 }
 
@@ -23,4 +27,15 @@ provider "aws" {
       ManagedBy   = "Terraform"
     }
   }
+}
+
+data "aws_eks_cluster_auth" "cluster" {
+  name = module.cluster.cluster_name
+}
+
+provider "kubectl" {
+  host                   = module.cluster.cluster_endpoint
+  cluster_ca_certificate = base64decode(module.cluster.cluster_certificate_authority_data)
+  token                  = data.aws_eks_cluster_auth.cluster.token
+  load_config_file       = false
 }

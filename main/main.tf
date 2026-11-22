@@ -18,3 +18,12 @@ module "cluster" {
 
   depends_on = [module.iam, module.network]
 }
+
+module "eks_capabilities" {
+  source = "../modules/eks_capabilities"
+
+  cluster_name     = module.cluster.cluster_name
+  ci_principal_arn = var.ci_principal_arn
+
+  depends_on = [module.cluster]
+}

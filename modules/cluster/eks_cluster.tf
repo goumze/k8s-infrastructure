@@ -16,6 +16,12 @@ resource "aws_eks_cluster" "main" {
 
   enabled_cluster_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
 
+  # API mode uses EKS access entries only; the aws-auth ConfigMap is not read.
+  access_config {
+    authentication_mode                         = "API"
+    bootstrap_cluster_creator_admin_permissions = true
+  }
+
   tags = {
     Name        = "k8s-agentic-ai-cluster"
     Environment = "production"

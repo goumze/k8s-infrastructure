@@ -34,6 +34,12 @@ variable "cluster_version" {
   default     = "1.37"
 }
 
+variable "ci_principal_arn" {
+  description = "IAM user or role ARN used by CI to apply RGDs (EKS access entry)"
+  type        = string
+  default     = null
+}
+
 variable "node_group_desired_size" {
   description = "Desired number of nodes in the node group"
   type        = number
