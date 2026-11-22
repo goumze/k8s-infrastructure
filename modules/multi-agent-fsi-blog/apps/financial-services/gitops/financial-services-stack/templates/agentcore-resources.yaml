@@ -1,0 +1,170 @@
+{{- /*
+Per-agent AgentCore + IAM provisioning via ACK + kro.
+
+For each agent:
+
+  Always rendered (native ACK resources — reconciled by the controllers the
+  ACK EKS Capability installs):
+    - Role                       (iam.services.k8s.aws — pods.eks.amazonaws.com
+                                   trust, inline policy: bedrock:InvokeModel*,
+                                   bedrock-agentcore:*)
+    - PodIdentityAssociation     (eks.services.k8s.aws — binds <agent>-sa to
+                                   the Role via roleRef)
+
+  Rendered per agentcore.* toggle as kro composite claims. Each claim's RGD
+  (gitops/addons/agentcore-rgds) emits the ACK Memory/Browser/CodeInterpreter
+  plus a FieldExport that publishes status.id into the connection Secret named
+  below, which agents-deployment.yaml wires into env:
+    - AgentCoreMemory            (when agentcore.memory = true)
+    - AgentCoreBrowser           (when agentcore.browser = true)
+    - AgentCoreCodeInterpreter   (when agentcore.codeInterpreter = true)
+*/ -}}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.namespace }}
+{{ range $agent := .Values.agents }}
+{{- $ns := $.Values.namespace }}
+{{- $role := printf "fs-%s-agent-role" $agent.name }}
+---
+# IAM Role for {{ $agent.name }} (Pod Identity target). The inline policy that
+# used to be a separate Crossplane RolePolicy is folded into inlinePolicies.
+apiVersion: iam.services.k8s.aws/v1alpha1
+kind: Role
+metadata:
+  name: {{ $role }}
+  namespace: {{ $ns }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  name: {{ $role }}
+  assumeRolePolicyDocument: |-
+    {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Effect": "Allow",
+          "Principal": { "Service": "pods.eks.amazonaws.com" },
+          "Action": [ "sts:AssumeRole", "sts:TagSession" ]
+        }
+      ]
+    }
+  inlinePolicies:
+    {{ $role }}-inline: |-
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "AgentCoreTool",
+            "Effect": "Allow",
+            "Action": [
+              "bedrock:InvokeAgentCoreTool",
+              "bedrock-agentcore:*"
+            ],
+            "Resource": "*"
+          },
+          {
+            "Sid": "BedrockInvoke",
+            "Effect": "Allow",
+            "Action": [
+              "bedrock:InvokeModel",
+              "bedrock:InvokeModelWithResponseStream",
+              "bedrock:Converse",
+              "bedrock:ConverseStream"
+            ],
+            "Resource": [
+              "arn:aws:bedrock:*::foundation-model/*",
+              "arn:aws:bedrock:*:*:inference-profile/*"
+            ]
+          }
+        ]
+      }
+  tags:
+    - key: Agent
+      value: {{ $agent.name }}
+    - key: Project
+      value: financial-services
+---
+# ---- Pod Identity Association: {{ $agent.name }}-sa → {{ $role }} ----
+apiVersion: eks.services.k8s.aws/v1alpha1
+kind: PodIdentityAssociation
+metadata:
+  name: {{ printf "fs-%s-pi" $agent.name }}
+  namespace: {{ $ns }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+    services.k8s.aws/region: {{ $.Values.awsRegion }}
+spec:
+  clusterName: {{ $.Values.eksClusterName }}
+  namespace: {{ $ns }}
+  serviceAccount: {{ printf "%s-sa" $agent.name }}
+  # Resolve the role ARN from the ACK Role above once it reconciles.
+  roleRef:
+    from:
+      name: {{ $role }}
+  tags:
+    Agent: {{ $agent.name }}
+
+{{- if $agent.agentcore.memory }}
+---
+# ---- Memory claim for {{ $agent.name }} ----
+# The RGD emits the ACK Memory + a FieldExport that publishes status.id into
+# the writeConnectionSecretName Secret. Agents consume MEMORY_ID from it.
+apiVersion: kro.run/v1alpha1
+kind: AgentCoreMemory
+metadata:
+  name: {{ printf "fs-%s-memory" $agent.name }}
+  namespace: {{ $ns }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  region: {{ $.Values.awsRegion }}
+  name: {{ printf "fs_%s_memory" (replace "-" "_" $agent.name) | quote }}
+  description: {{ printf "Memory for fs-%s" $agent.name | quote }}
+  eventExpiryDuration: 30
+  tags:
+    Agent: {{ $agent.name }}
+  writeConnectionSecretName: {{ printf "fs-%s-memory-outputs" $agent.name }}
+{{- end }}
+
+{{- if $agent.agentcore.browser }}
+---
+# ---- Browser claim for {{ $agent.name }} ----
+apiVersion: kro.run/v1alpha1
+kind: AgentCoreBrowser
+metadata:
+  name: {{ printf "fs-%s-browser" $agent.name }}
+  namespace: {{ $ns }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  region: {{ $.Values.awsRegion }}
+  name: {{ printf "fs_%s_browser" (replace "-" "_" $agent.name) | quote }}
+  description: {{ printf "Browser for fs-%s" $agent.name | quote }}
+  networkMode: {{ $.Values.networkMode }}
+  tags:
+    Agent: {{ $agent.name }}
+  writeConnectionSecretName: {{ printf "fs-%s-browser-outputs" $agent.name }}
+{{- end }}
+
+{{- if $agent.agentcore.codeInterpreter }}
+---
+# ---- Code Interpreter claim for {{ $agent.name }} ----
+apiVersion: kro.run/v1alpha1
+kind: AgentCoreCodeInterpreter
+metadata:
+  name: {{ printf "fs-%s-code-interpreter" $agent.name }}
+  namespace: {{ $ns }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  region: {{ $.Values.awsRegion }}
+  name: {{ printf "fs_%s_code_interpreter" (replace "-" "_" $agent.name) | quote }}
+  description: {{ printf "Code Interpreter for fs-%s" $agent.name | quote }}
+  networkMode: {{ $.Values.networkMode }}
+  tags:
+    Agent: {{ $agent.name }}
+  writeConnectionSecretName: {{ printf "fs-%s-code-interpreter-outputs" $agent.name }}
+{{- end }}
+
+{{- end }}

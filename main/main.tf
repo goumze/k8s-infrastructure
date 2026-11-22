@@ -27,3 +27,13 @@ module "eks_capabilities" {
 
   depends_on = [module.cluster]
 }
+
+module "argocd" {
+  source = "../modules/argocd"
+
+  cluster_name    = module.cluster.cluster_name
+  region          = var.aws_region
+  oidc_issuer_url = module.cluster.oidc_issuer_url
+
+  depends_on = [module.cluster, module.eks_capabilities]
+}
