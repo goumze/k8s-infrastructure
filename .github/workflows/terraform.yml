@@ -3,7 +3,7 @@ name: Terraform
 on:
   push:
     branches:
-      - main
+      - feature/aws_eks_cluster_acks_kro
     paths:
       - "main/**"
       - "modules/**"
@@ -28,7 +28,7 @@ jobs:
   terraform:
     name: Terraform
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/feature/aws_eks_cluster_acks_kro'
     defaults:
       run:
         working-directory: main
