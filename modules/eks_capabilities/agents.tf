@@ -12,12 +12,6 @@ locals {
     market-data       = { capabilities = ["memory", "code_interpreter", "browser"] }
   }
 
-  agentcore_kinds = {
-    memory           = "AgentCoreMemory"
-    code_interpreter = "AgentCoreCodeInterpreter"
-    browser          = "AgentCoreBrowser"
-  }
-
   agentcore_resource_types = {
     memory           = "memory"
     code_interpreter = "code-interpreter"
@@ -53,13 +47,6 @@ locals {
       "bedrock-agentcore:ConnectBrowserLiveViewStream",
     ]
   }
-
-  # One AgentCore instance per agent capability, keyed "<agent>-<capability>".
-  agentcore_instances = merge([
-    for agent, cfg in local.agents : {
-      for cap in cfg.capabilities : "${agent}-${cap}" => { agent = agent, capability = cap }
-    }
-  ]...)
 }
 
 resource "kubectl_manifest" "namespace" {
@@ -77,38 +64,12 @@ resource "kubectl_manifest" "agent_service_account" {
     apiVersion = "v1"
     kind       = "ServiceAccount"
     metadata = {
-      name      = each.key
+      name      = "${each.key}-sa"
       namespace = local.namespace
     }
   })
 
   depends_on = [kubectl_manifest.namespace]
-}
-
-# AgentCore resources are created through the kro RGDs (see rgds/).
-resource "kubectl_manifest" "agentcore_instance" {
-  for_each = local.agentcore_instances
-
-  yaml_body = yamlencode({
-    apiVersion = "fsi.aws.example.com/v1alpha1"
-    kind       = local.agentcore_kinds[each.value.capability]
-    metadata = {
-      name      = each.key
-      namespace = local.namespace
-    }
-    spec = merge(
-      {
-        region                    = data.aws_region.current.region
-        name                      = replace("${each.value.agent}_${each.value.capability}", "-", "_")
-        description               = "${each.value.agent} ${each.value.capability}"
-        tags                      = { agent = each.value.agent }
-        writeConnectionSecretName = each.key
-      },
-      each.value.capability == "memory" ? { eventExpiryDuration = 30 } : { networkMode = "PUBLIC" }
-    )
-  })
-
-  depends_on = [kubectl_manifest.rgd, kubectl_manifest.namespace]
 }
 
 # Pod Identity roles, one per agent. The trust policy is for EKS Pod Identity,
@@ -137,6 +98,20 @@ resource "aws_iam_role" "agent" {
 data "aws_iam_policy_document" "agent" {
   for_each = local.agents
 
+  statement {
+    sid = "BedrockInvoke"
+    actions = [
+      "bedrock:InvokeModel",
+      "bedrock:InvokeModelWithResponseStream",
+      "bedrock:Converse",
+      "bedrock:ConverseStream",
+    ]
+    resources = [
+      "arn:aws:bedrock:*::foundation-model/*",
+      "arn:aws:bedrock:*:*:inference-profile/*",
+    ]
+  }
+
   dynamic "statement" {
     for_each = each.value.capabilities
     content {
@@ -161,7 +136,7 @@ resource "aws_eks_pod_identity_association" "agent" {
 
   cluster_name    = var.cluster_name
   namespace       = local.namespace
-  service_account = each.key
+  service_account = "${each.key}-sa"
   role_arn        = aws_iam_role.agent[each.key].arn
 
   depends_on = [kubectl_manifest.agent_service_account]
