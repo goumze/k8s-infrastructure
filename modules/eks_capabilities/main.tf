@@ -61,6 +61,7 @@ resource "aws_eks_capability" "kro" {
   tags                      = var.tags
 }
 
+
 resource "aws_eks_access_entry" "ci" {
   count = var.ci_principal_arn == null ? 0 : 1
 
