@@ -13,6 +13,7 @@ data "aws_iam_policy_document" "capability_assume_role" {
   }
 }
 
+#rectified
 resource "aws_iam_role" "ack" {
   name               = "${var.cluster_name}-ack-capability"
   assume_role_policy = data.aws_iam_policy_document.capability_assume_role.json
