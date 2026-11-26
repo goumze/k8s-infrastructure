@@ -1,0 +1,106 @@
+{{- $api := .Values.api }}
+{{- $ns := .Values.namespace }}
+{{- $sa := printf "%s-sa" $api.name }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $sa }}
+  namespace: {{ $ns }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $api.name }}
+  namespace: {{ $ns }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  selector:
+    app: {{ $api.name }}
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $api.name }}
+  namespace: {{ $ns }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ $api.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ $api.name }}
+        role: "api"
+    spec:
+      serviceAccountName: {{ $sa }}
+      volumes:
+        {{- include "fs.projectedToken" (dict "root" $) | nindent 8 }}
+      containers:
+        - name: api
+          image: "{{ .Values.images.registry }}/{{ $api.image.repository }}:{{ $api.image.tag }}"
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          ports:
+            - containerPort: 8080
+          env:
+            - name: A2A_GATEWAY_URL
+              value: {{ .Values.agentGateway.url | quote }}
+            - name: TARGET_AGENT
+              value: {{ $api.targetAgent | quote }}
+            - name: ORCHESTRATOR_TIMEOUT_SECONDS
+              value: {{ $api.timeoutSeconds | quote }}
+          volumeMounts:
+            {{- include "fs.tokenMount" (dict "root" $) | nindent 12 }}
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 15
+{{- if $api.ingress.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $api.name }}
+  namespace: {{ $ns }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+    alb.ingress.kubernetes.io/scheme: {{ $api.ingress.scheme | quote }}
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /healthz
+    {{- if $api.ingress.allowedCidrs }}
+    alb.ingress.kubernetes.io/inbound-cidrs: {{ join "," $api.ingress.allowedCidrs | quote }}
+    {{- end }}
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $api.name }}
+                port:
+                  number: 8080
+{{- end }}

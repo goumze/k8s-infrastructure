@@ -3,6 +3,8 @@
 {{- $audience := .Values.agentGateway.audience -}}
 {{- $gwName := .Values.agentGateway.gatewayName -}}
 {{- $gwNs := .Values.agentGateway.gatewayNamespace -}}
+{{- $apiSub := printf "system:serviceaccount:%s:%s-sa" $ns .Values.api.name -}}
+{{- $apiCallers := .Values.api.allowedCallers | default list -}}
 
 {{- /* Build SA lists grouped by role, derived from .Values.agents. */ -}}
 {{- $orchestratorSubs := list -}}
@@ -58,8 +60,8 @@ spec:
 # One AgentgatewayPolicy per specialist HTTPRoute. CEL matchExpressions are
 # OR-combined, so listing every orchestrator SA allows any of them. Rules
 # are deny-by-default once Allow is attached, so unknown principals get 403.
-# Orchestrators have no policy attached to their own /agents/<name> route —
-# they are the public entry points.
+# Orchestrators have no policy on their own /agents/<name> route here; their
+# caller check is section 3 (only the Flask API pod may call them).
 # ----------------------------------------------------------------------------
 {{- range $a := .Values.agents }}
 {{- if eq $a.role "specialist" }}
@@ -86,10 +88,42 @@ spec:
           {{- end }}
 {{- end }}
 {{- end }}
+{{- end }}
+
+# ----------------------------------------------------------------------------
+# 3. Orchestrator authorization — only the Flask API pod may call it
+#
+# The orchestrator is the entry point for external work, but it is no longer
+# open: the Flask API pod (its own ServiceAccount) is the only allowed caller,
+# the same JWT + CEL check the agents go through.
+# ----------------------------------------------------------------------------
+{{- range $a := .Values.agents }}
+{{- if eq $a.role "orchestrator" }}
+---
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: {{ $a.name }}-a2a-authz
+  namespace: {{ $ns }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: {{ $a.name }}-a2a-route
+  traffic:
+    authorization:
+      action: Allow
+      policy:
+        matchExpressions:
+          - 'jwt.sub == "{{ $apiSub }}"'
+{{- end }}
+{{- end }}
 
 ---
 # ----------------------------------------------------------------------------
-# 3. MCP authorization — only agents that declared `tools` may call /mcp
+# 4. MCP authorization — only agents that declared `tools` may call /mcp
 #
 # Derived from .Values.agents[].tools. Any agent with a non-empty tools list
 # is an allowed MCP caller. This is specialist-level granularity — per-tool
@@ -117,9 +151,30 @@ spec:
           - 'jwt.sub == "{{ $sub }}"'
           {{- end }}
 
-# Orchestrator HTTPRoutes (e.g. /agents/financial-advisor) intentionally have
-# no authorization policy — they are the public entry points for external
-# callers. The Gateway-level jwtAuthentication still requires a valid SA
-# token with audience=agent-gateway, so unauthenticated traffic is blocked
-# at the edge.
+{{- /* 5. Inbound authorization for the Flask API route. Only rendered when
+       api.allowedCallers is set; otherwise any valid agent-gateway token passes. */}}
+{{- if $apiCallers }}
+---
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: financial-api-authz
+  namespace: {{ $ns }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: {{ .Values.api.name }}-route
+  traffic:
+    authorization:
+      action: Allow
+      policy:
+        matchExpressions:
+          {{- range $sub := $apiCallers }}
+          - 'jwt.sub == "{{ $sub }}"'
+          {{- end }}
+{{- end }}
+
 {{- end }}

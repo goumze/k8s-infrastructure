@@ -83,3 +83,51 @@ spec:
           name: {{ $agent.name }}-backend
           weight: 1
 {{- end }}
+
+{{- $api := .Values.api }}
+---
+# -------- Flask API front door backend + route (inbound, JWT-protected) --------
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayBackend
+metadata:
+  name: {{ $api.name }}-backend
+  namespace: {{ $ns }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  static:
+    host: {{ $api.name }}.{{ $ns }}.svc.cluster.local
+    port: 8080
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ $api.name }}-route
+  namespace: {{ $ns }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: {{ $gw.gatewayName }}
+      namespace: {{ $gw.gatewayNamespace }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api/v1
+        - path:
+            type: PathPrefix
+            value: /apidocs
+        - path:
+            type: PathPrefix
+            value: /apispec_1.json
+        - path:
+            type: PathPrefix
+            value: /flasgger_static
+      backendRefs:
+        - group: agentgateway.dev
+          kind: AgentgatewayBackend
+          name: {{ $api.name }}-backend
+          weight: 1

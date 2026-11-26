@@ -81,6 +81,34 @@ agents:
       - get_stock_price
       - get_market_trends
 
+# ---------------------------------------------------------------------------
+# Flask API front door. A single pod that is NOT an agent: it has its own
+# ServiceAccount and image, and forwards every request to the orchestrator
+# (targetAgent) through Agent Gateway. It authenticates with its projected SA
+# token (audience agent-gateway) exactly like the agent pods, and the gateway
+# authorizes it on the orchestrator route only.
+# ---------------------------------------------------------------------------
+api:
+  name: financial-api
+  targetAgent: financial-advisor
+  timeoutSeconds: 180
+  # Full ServiceAccount subjects allowed to call the API route, e.g.
+  # "system:serviceaccount:financial-services:my-client-sa". Callers must
+  # still present a valid JWT (audience agent-gateway). Empty = any valid
+  # agent-gateway token is accepted.
+  allowedCallers: []
+  # Public entry point for browsers (Swagger UI). Creates an AWS ALB via the
+  # Auto Mode ALB controller. This path goes straight to the pod and does NOT
+  # pass through Agent Gateway, so it has no JWT check.
+  ingress:
+    enabled: true
+    scheme: internet-facing
+    # CIDRs allowed to reach the ALB, e.g. ["203.0.113.4/32"]. Empty = open to all.
+    allowedCidrs: []
+  image:
+    repository: financial-services-api
+    tag: financial-api-v1
+
 # Shared image config — the registry and MCP server image.
 images:
   pullPolicy: Always
