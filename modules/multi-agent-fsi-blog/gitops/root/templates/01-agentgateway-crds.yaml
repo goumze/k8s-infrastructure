@@ -10,9 +10,9 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: ghcr.io/kgateway-dev/charts
+    repoURL: ghcr.io/agentgateway/charts
     chart: agentgateway-crds
-    targetRevision: v2.2.0-main
+    targetRevision: 1.6.0
   destination:
     server: https://kubernetes.default.svc
     namespace: {{ .Values.namespaces.agentGateway | quote }}

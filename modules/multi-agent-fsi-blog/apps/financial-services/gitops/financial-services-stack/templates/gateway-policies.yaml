@@ -88,7 +88,6 @@ spec:
           {{- end }}
 {{- end }}
 {{- end }}
-{{- end }}
 
 # ----------------------------------------------------------------------------
 # 3. Orchestrator authorization — only the Flask API pod may call it
