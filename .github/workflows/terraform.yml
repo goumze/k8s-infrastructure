@@ -69,8 +69,8 @@ jobs:
         run: terraform plan -input=false -out=tfplan
 
       #recommit comment
-      - name: Apply Terraform plan
-        run: terraform apply -input=false -auto-approve tfplan
+      # - name: Apply Terraform plan
+      #   run: terraform apply -input=false -auto-approve tfplan
 
-      # - name: Apply Terraform destroy
-      #   run: terraform destroy -input=false -auto-approve
+      - name: Apply Terraform destroy
+        run: terraform destroy -input=false -auto-approve
