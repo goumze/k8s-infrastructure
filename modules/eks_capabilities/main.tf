@@ -20,6 +20,14 @@ resource "aws_iam_role" "ack" {
   tags               = var.tags
 }
 
+# IAM is eventually consistent: EKS validates the capability role's trust
+# policy immediately after creation and can reject a freshly created role.
+resource "time_sleep" "iam_propagation" {
+  create_duration = "30s"
+
+  depends_on = [aws_iam_role.ack, aws_iam_role.kro]
+}
+
 # ACK controller permissions for AgentCore resources created from the RGDs.
 data "aws_iam_policy_document" "ack_agentcore" {
   statement {
@@ -50,7 +58,7 @@ resource "aws_eks_capability" "ack" {
   delete_propagation_policy = "RETAIN"
   tags                      = var.tags
 
-  depends_on = [aws_iam_role.ack, aws_iam_role_policy.ack_agentcore]
+  depends_on = [time_sleep.iam_propagation, aws_iam_role_policy.ack_agentcore]
 }
 
 resource "aws_eks_capability" "kro" {
@@ -61,7 +69,7 @@ resource "aws_eks_capability" "kro" {
   delete_propagation_policy = "RETAIN"
   tags                      = var.tags
 
-  depends_on = [aws_iam_role.kro]
+  depends_on = [time_sleep.iam_propagation]
 }
 
 
