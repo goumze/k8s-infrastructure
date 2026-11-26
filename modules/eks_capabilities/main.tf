@@ -2,6 +2,8 @@ data "aws_region" "current" {}
 
 data "aws_caller_identity" "current" {}
 
+data "aws_partition" "current" {}
+
 data "aws_iam_policy_document" "capability_assume_role" {
   statement {
     actions = ["sts:AssumeRole", "sts:TagSession"]
@@ -72,6 +74,91 @@ resource "aws_eks_capability" "kro" {
   depends_on = [time_sleep.iam_propagation]
 }
 
+locals {
+  kro_username = "arn:${data.aws_partition.current.partition}:sts::${data.aws_caller_identity.current.account_id}:assumed-role/${aws_iam_role.kro.name}/KRO"
+  kro_ack_resources = [
+    "browsers",
+    "codeinterpreters",
+    "memories",
+  ]
+}
+
+# kro watches composed resources across namespaces, but may modify them only
+# in the application namespace.
+resource "kubectl_manifest" "kro_ack_watch_role" {
+  yaml_body = yamlencode({
+    apiVersion = "rbac.authorization.k8s.io/v1"
+    kind       = "ClusterRole"
+    metadata   = { name = "${var.cluster_name}-kro-agentcore-watch" }
+    rules = [{
+      apiGroups = ["bedrockagentcorecontrol.services.k8s.aws"]
+      resources = local.kro_ack_resources
+      verbs     = ["list", "watch"]
+    }]
+  })
+}
+
+resource "kubectl_manifest" "kro_ack_watch_binding" {
+  yaml_body = yamlencode({
+    apiVersion = "rbac.authorization.k8s.io/v1"
+    kind       = "ClusterRoleBinding"
+    metadata   = { name = "${var.cluster_name}-kro-agentcore-watch" }
+    roleRef = {
+      apiGroup = "rbac.authorization.k8s.io"
+      kind     = "ClusterRole"
+      name     = "${var.cluster_name}-kro-agentcore-watch"
+    }
+    subjects = [{
+      apiGroup = "rbac.authorization.k8s.io"
+      kind     = "User"
+      name     = local.kro_username
+    }]
+  })
+
+  depends_on = [kubectl_manifest.kro_ack_watch_role, aws_eks_capability.kro]
+}
+
+resource "kubectl_manifest" "kro_ack_role" {
+  yaml_body = yamlencode({
+    apiVersion = "rbac.authorization.k8s.io/v1"
+    kind       = "Role"
+    metadata = {
+      name      = "kro-agentcore"
+      namespace = local.namespace
+    }
+    rules = [{
+      apiGroups = ["bedrockagentcorecontrol.services.k8s.aws"]
+      resources = local.kro_ack_resources
+      verbs     = ["get", "list", "watch", "create", "update", "patch", "delete"]
+    }]
+  })
+
+  depends_on = [kubectl_manifest.namespace]
+}
+
+resource "kubectl_manifest" "kro_ack_binding" {
+  yaml_body = yamlencode({
+    apiVersion = "rbac.authorization.k8s.io/v1"
+    kind       = "RoleBinding"
+    metadata = {
+      name      = "kro-agentcore"
+      namespace = local.namespace
+    }
+    roleRef = {
+      apiGroup = "rbac.authorization.k8s.io"
+      kind     = "Role"
+      name     = "kro-agentcore"
+    }
+    subjects = [{
+      apiGroup = "rbac.authorization.k8s.io"
+      kind     = "User"
+      name     = local.kro_username
+    }]
+  })
+
+  depends_on = [kubectl_manifest.kro_ack_role, aws_eks_capability.kro]
+}
+
 
 resource "aws_eks_access_entry" "ci" {
   count = var.ci_principal_arn == null ? 0 : 1
@@ -102,5 +189,10 @@ resource "kubectl_manifest" "rgd" {
 
   yaml_body = file("${path.module}/rgds/${each.value}")
 
-  depends_on = [aws_eks_capability.kro, aws_eks_capability.ack]
+  depends_on = [
+    aws_eks_capability.kro,
+    aws_eks_capability.ack,
+    kubectl_manifest.kro_ack_watch_binding,
+    kubectl_manifest.kro_ack_binding,
+  ]
 }
