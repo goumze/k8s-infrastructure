@@ -97,11 +97,10 @@ api:
   # still present a valid JWT (audience agent-gateway). Empty = any valid
   # agent-gateway token is accepted.
   allowedCallers: []
-  # Public entry point for browsers (Swagger UI). Creates an AWS ALB via the
-  # Auto Mode ALB controller. This path goes straight to the pod and does NOT
-  # pass through Agent Gateway, so it has no JWT check.
+  # Optional direct entry point. Disabled because it bypasses Agent Gateway
+  # and its JWT checks; use the gateway ALB instead.
   ingress:
-    enabled: true
+    enabled: false
     scheme: internet-facing
     # CIDRs allowed to reach the ALB, e.g. ["203.0.113.4/32"]. Empty = open to all.
     allowedCidrs: []

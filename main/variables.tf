@@ -34,6 +34,12 @@ variable "cluster_version" {
   default     = "1.37"
 }
 
+variable "bootstrap_self_managed_addons" {
+  description = "Keep true for the existing cluster; use false when creating a new Auto Mode cluster."
+  type        = bool
+  default     = true
+}
+
 variable "ci_principal_arn" {
   description = "IAM user or role ARN used by CI to apply RGDs (EKS access entry)"
   type        = string

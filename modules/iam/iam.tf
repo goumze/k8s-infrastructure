@@ -10,7 +10,7 @@ resource "aws_iam_role" "cluster_role" {
     Version = "2012-10-17"
     Statement = [
       {
-        Action = "sts:AssumeRole"
+        Action = ["sts:AssumeRole", "sts:TagSession"]
         Effect = "Allow"
         Principal = {
           Service = "eks.amazonaws.com"
@@ -31,6 +31,18 @@ resource "aws_iam_role_policy_attachment" "cluster_policy" {
 
 resource "aws_iam_role_policy_attachment" "cluster_vpc_resource_controller" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSVPCResourceController"
+  role       = aws_iam_role.cluster_role.name
+}
+
+resource "aws_iam_role_policy_attachment" "cluster_auto_mode" {
+  for_each = toset([
+    "AmazonEKSComputePolicy",
+    "AmazonEKSBlockStoragePolicyV2",
+    "AmazonEKSLoadBalancingPolicy",
+    "AmazonEKSNetworkingPolicy",
+  ])
+
+  policy_arn = "arn:aws:iam::aws:policy/${each.value}"
   role       = aws_iam_role.cluster_role.name
 }
 

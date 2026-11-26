@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: agent-gateway-alb
+  namespace: agentgateway-system
+  annotations:
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":8080}]'
+    alb.ingress.kubernetes.io/healthcheck-port: "15021"
+    alb.ingress.kubernetes.io/healthcheck-path: /healthz/ready
+spec:
+  ingressClassName: agentgateway-alb
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: agent-gateway-proxy
+                port:
+                  number: 8080

@@ -1,0 +1,11 @@
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayParameters
+metadata:
+  name: agent-gateway-internal
+  namespace: agentgateway-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  service:
+    spec:
+      type: ClusterIP

@@ -7,6 +7,25 @@ resource "aws_eks_cluster" "main" {
   version  = var.cluster_version
   role_arn = var.cluster_role_arn
 
+  bootstrap_self_managed_addons = var.bootstrap_self_managed_addons
+
+  compute_config {
+    enabled    = true
+    node_pools = []
+  }
+
+  kubernetes_network_config {
+    elastic_load_balancing {
+      enabled = true
+    }
+  }
+
+  storage_config {
+    block_storage {
+      enabled = true
+    }
+  }
+
   vpc_config {
     subnet_ids              = var.subnet_ids
     security_group_ids      = [var.cluster_security_group_id]
