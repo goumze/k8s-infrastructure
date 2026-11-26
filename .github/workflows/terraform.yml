@@ -68,7 +68,7 @@ jobs:
       - name: Create Terraform plan
         run: terraform plan -input=false -out=tfplan
 
-      #recommit comment
+      #recommit comment again
       - name: Apply Terraform plan
         run: terraform apply -input=false -auto-approve tfplan
 
