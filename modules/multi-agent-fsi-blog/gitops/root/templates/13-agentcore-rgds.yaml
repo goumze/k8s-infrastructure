@@ -30,6 +30,9 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true
+      # Terraform owns these RGDs and destroys them after Argo applications.
+      - Delete=false
+      - Prune=false
       # The kro.run ResourceGraphDefinition CRD is installed by the kro EKS
       # Capability out-of-band. If ArgoCD's first reconcile races ahead of the
       # Capability reaching ACTIVE, skip the dry-run until the CRD lands.
