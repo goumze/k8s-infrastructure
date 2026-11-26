@@ -7,6 +7,9 @@ gitOpsRepo:
 # Root path under the repo that holds the multi-agent-fsi-blog tree.
 basePath: multi-agent-fsi-blog
 
+# Override with a registered EKS cluster ARN for the managed Argo CD capability.
+destinationServer: https://kubernetes.default.svc
+
 # ArgoCD destination namespaces per addon.
 namespaces:
   agentGateway: agentgateway-system

@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: agentcore-rgds
-  namespace: argocd
+  namespace: {{ .Release.Namespace }}
   annotations:
     # Wave 1: the ACK + kro controllers are installed by AWS-managed EKS
     # Capabilities (terraform/cluster/ack_capability_iam.tf), so by the time
@@ -21,7 +21,7 @@ spec:
     targetRevision: {{ .Values.gitOpsRepo.branch | quote }}
     path: {{ printf "%s/gitops/addons/agentcore-rgds" .Values.basePath | quote }}
   destination:
-    server: https://kubernetes.default.svc
+    server: {{ .Values.destinationServer | quote }}
     namespace: {{ .Values.namespaces.agentcoreRgds | quote }}
   syncPolicy:
     automated:

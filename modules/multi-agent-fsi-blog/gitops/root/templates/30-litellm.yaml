@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: litellm
-  namespace: argocd
+  namespace: {{ .Release.Namespace }}
   annotations:
     argocd.argoproj.io/sync-wave: "3"
   finalizers:
@@ -21,7 +21,7 @@ spec:
         valueFiles:
           - {{ printf "$values/%s/gitops/addons/litellm/values.yaml" .Values.basePath | quote }}
   destination:
-    server: https://kubernetes.default.svc
+    server: {{ .Values.destinationServer | quote }}
     namespace: {{ .Values.namespaces.litellm | quote }}
   syncPolicy:
     automated:

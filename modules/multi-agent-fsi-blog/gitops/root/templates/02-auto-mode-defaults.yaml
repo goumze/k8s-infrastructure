@@ -8,7 +8,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: auto-mode-defaults
-  namespace: argocd
+  namespace: {{ .Release.Namespace }}
   annotations:
     # Wave 0 — before any addon with a PVC (LiteLLM=3) or Ingress.
     argocd.argoproj.io/sync-wave: "0"
@@ -21,7 +21,7 @@ spec:
     targetRevision: {{ .Values.gitOpsRepo.branch | quote }}
     path: {{ printf "%s/gitops/addons/auto-mode-defaults" .Values.basePath | quote }}
   destination:
-    server: https://kubernetes.default.svc
+    server: {{ .Values.destinationServer | quote }}
     namespace: default
   syncPolicy:
     automated:

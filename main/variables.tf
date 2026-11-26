@@ -40,6 +40,37 @@ variable "ci_principal_arn" {
   default     = null
 }
 
+variable "enable_argocd_identity" {
+  description = "Create an account-level Identity Center instance and Argo CD administrator."
+  type        = bool
+  default     = false
+}
+
+variable "argocd_identity_admin" {
+  description = "Identity Center administrator details. Set through a private tfvars file or environment variable."
+  type = object({
+    user_name    = string
+    display_name = string
+    given_name   = string
+    family_name  = string
+    email        = string
+  })
+  default   = null
+  sensitive = true
+}
+
+variable "enable_managed_argocd" {
+  description = "Create the managed Argo CD capability and managed GitOps applications."
+  type        = bool
+  default     = false
+}
+
+variable "self_managed_argocd_paused" {
+  description = "Confirm the existing self-managed Argo CD controllers were paused before cutover."
+  type        = bool
+  default     = false
+}
+
 variable "node_group_desired_size" {
   description = "Desired number of nodes in the node group"
   type        = number

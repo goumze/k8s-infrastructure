@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: agent-gateway
-  namespace: argocd
+  namespace: {{ .Release.Namespace }}
   annotations:
     argocd.argoproj.io/sync-wave: "2"
   finalizers:
@@ -44,7 +44,7 @@ spec:
           create: true
           name: agent-gateway
   destination:
-    server: https://kubernetes.default.svc
+    server: {{ .Values.destinationServer | quote }}
     namespace: {{ .Values.namespaces.agentGateway | quote }}
   syncPolicy:
     automated:
