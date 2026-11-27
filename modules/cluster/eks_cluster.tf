@@ -10,8 +10,9 @@ resource "aws_eks_cluster" "main" {
   bootstrap_self_managed_addons = var.bootstrap_self_managed_addons
 
   compute_config {
-    enabled    = true
-    node_pools = []
+    enabled       = true
+    node_pools    = ["general-purpose", "system"]
+    node_role_arn = var.node_role_arn
   }
 
   kubernetes_network_config {
@@ -44,40 +45,5 @@ resource "aws_eks_cluster" "main" {
   tags = {
     Name        = "k8s-agentic-ai-cluster"
     Environment = "production"
-  }
-}
-
-# ============================================================================
-# EKS NODE GROUP
-# ============================================================================
-
-resource "aws_eks_node_group" "main" {
-  cluster_name    = aws_eks_cluster.main.name
-  node_group_name = "k8s-node-group"
-  node_role_arn   = var.node_role_arn
-  subnet_ids      = var.subnet_ids
-
-  scaling_config {
-    desired_size = 2
-    max_size     = 3
-    min_size     = 1
-  }
-
-  update_config {
-    max_unavailable = 1
-  }
-
-  ami_type       = "AL2023_x86_64_STANDARD"
-  instance_types = ["t3.xlarge"]
-  capacity_type  = "ON_DEMAND"
-  disk_size      = 100
-
-  tags = {
-    Name        = "k8s-node-group"
-    Environment = "production"
-  }
-
-  lifecycle {
-    create_before_destroy = true
   }
 }

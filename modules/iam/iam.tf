@@ -88,6 +88,17 @@ resource "aws_iam_role_policy_attachment" "node_ssm_policy" {
   role       = aws_iam_role.node_role.name
 }
 
+# Required by EKS Auto Mode for the node role.
+resource "aws_iam_role_policy_attachment" "node_auto_mode" {
+  for_each = toset([
+    "AmazonEKSWorkerNodeMinimalPolicy",
+    "AmazonEC2ContainerRegistryPullOnly",
+  ])
+
+  policy_arn = "arn:aws:iam::aws:policy/${each.value}"
+  role       = aws_iam_role.node_role.name
+}
+
 output "cluster_role_arn" {
   value = aws_iam_role.cluster_role.arn
 }
