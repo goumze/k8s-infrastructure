@@ -116,7 +116,7 @@ resource "aws_eks_capability" "managed_argocd" {
   }
 
   lifecycle {
-    prevent_destroy = true
+    prevent_destroy = false
     precondition {
       condition     = var.enable_argocd_identity && var.self_managed_argocd_paused
       error_message = "Enable Identity Center and pause the self-managed Argo CD controllers before the managed cutover."
