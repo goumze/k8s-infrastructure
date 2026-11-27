@@ -21,9 +21,9 @@ permissions:
 
 env:
   TF_IN_AUTOMATION: "true"
-  TF_VAR_enable_argocd_identity: ${{ vars.ENABLE_ARGOCD_IDENTITY || 'false' }}
-  TF_VAR_enable_managed_argocd: ${{ vars.ENABLE_MANAGED_ARGOCD || 'false' }}
-  TF_VAR_self_managed_argocd_paused: ${{ vars.SELF_MANAGED_ARGOCD_PAUSED || 'false' }}
+  TF_VAR_enable_argocd_identity: ${{ vars.ENABLE_ARGOCD_IDENTITY || 'true' }}
+  TF_VAR_enable_managed_argocd: ${{ vars.ENABLE_MANAGED_ARGOCD || 'true' }}
+  TF_VAR_self_managed_argocd_paused: ${{ vars.SELF_MANAGED_ARGOCD_PAUSED || 'true' }}
   TF_VAR_argocd_identity_admin: ${{ secrets.ARGOCD_IDENTITY_ADMIN || 'null' }}
 
 concurrency:
