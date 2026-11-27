@@ -55,6 +55,16 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ vars.AWS_REGION || 'ap-south-1' }}
 
+      # The cluster uses API auth mode, so the CI identity needs an EKS access entry
+      # (created via ci_principal_arn) before the kubernetes/helm providers can authenticate.
+      - name: Export CI principal ARN
+        env:
+          CI_PRINCIPAL_ARN: ${{ vars.CI_PRINCIPAL_ARN }}
+        run: |
+          if [ -n "$CI_PRINCIPAL_ARN" ]; then
+            echo "TF_VAR_ci_principal_arn=$CI_PRINCIPAL_ARN" >> "$GITHUB_ENV"
+          fi
+
       - name: Check Terraform formatting
         working-directory: .
         run: terraform fmt -check -recursive
