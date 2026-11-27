@@ -51,7 +51,7 @@ resource "aws_identitystore_user" "argocd_admin" {
   }
 
   lifecycle {
-    prevent_destroy = true
+    prevent_destroy = false
   }
 }
 
