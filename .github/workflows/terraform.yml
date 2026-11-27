@@ -64,25 +64,6 @@ jobs:
             echo "TF_VAR_ci_principal_arn=$CI_PRINCIPAL_ARN" >> "$GITHUB_ENV"
           fi
 
-      # Builds the Argo CD Identity Center admin object from repo variables (jq handles quoting).
-      - name: Export Argo CD admin details
-        env:
-          ADMIN_USER_NAME: ${{ vars.ARGOCD_ADMIN_USER_NAME }}
-          ADMIN_DISPLAY_NAME: ${{ vars.ARGOCD_ADMIN_DISPLAY_NAME }}
-          ADMIN_GIVEN_NAME: ${{ vars.ARGOCD_ADMIN_GIVEN_NAME }}
-          ADMIN_FAMILY_NAME: ${{ vars.ARGOCD_ADMIN_FAMILY_NAME }}
-          ADMIN_EMAIL: ${{ vars.ARGOCD_ADMIN_EMAIL }}
-        run: |
-          if [ -z "$ADMIN_USER_NAME" ] || [ -z "$ADMIN_DISPLAY_NAME" ] || [ -z "$ADMIN_GIVEN_NAME" ] || [ -z "$ADMIN_FAMILY_NAME" ] || [ -z "$ADMIN_EMAIL" ]; then
-            echo "::error::Set the ARGOCD_ADMIN_USER_NAME, ARGOCD_ADMIN_DISPLAY_NAME, ARGOCD_ADMIN_GIVEN_NAME, ARGOCD_ADMIN_FAMILY_NAME and ARGOCD_ADMIN_EMAIL repository variables (Settings > Secrets and variables > Actions > Variables)."
-            exit 1
-          fi
-          ADMIN=$(jq -cn \
-            --arg u "$ADMIN_USER_NAME" --arg d "$ADMIN_DISPLAY_NAME" \
-            --arg g "$ADMIN_GIVEN_NAME" --arg f "$ADMIN_FAMILY_NAME" --arg e "$ADMIN_EMAIL" \
-            '{user_name: $u, display_name: $d, given_name: $g, family_name: $f, email: $e}')
-          echo "TF_VAR_argocd_identity_admin=$ADMIN" >> "$GITHUB_ENV"
-
       - name: Check Terraform formatting
         working-directory: .
         run: terraform fmt -check -recursive

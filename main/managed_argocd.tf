@@ -1,4 +1,12 @@
 locals {
+  # Temporary dummy Identity Center admin for teardown. Replace before real use.
+  argocd_admin = {
+    user_name    = "dummyadmin"
+    display_name = "Dummy Admin"
+    given_name   = "Dummy"
+    family_name  = "Admin"
+    email        = "dummy.admin@example.com"
+  }
   managed_argocd_namespace = "argocd-managed"
   root_chart_path          = "${path.module}/../modules/multi-agent-fsi-blog/gitops/root"
   root_chart_hash          = sha256(join("", [for f in sort(tolist(fileset(local.root_chart_path, "**"))) : filesha256("${local.root_chart_path}/${f}")]))
@@ -37,16 +45,16 @@ resource "aws_identitystore_user" "argocd_admin" {
   count = var.enable_argocd_identity ? 1 : 0
 
   identity_store_id = aws_cloudformation_stack.argocd_identity[0].outputs["IdentityStoreId"]
-  user_name         = try(var.argocd_identity_admin.user_name, null)
-  display_name      = try(var.argocd_identity_admin.display_name, null)
+  user_name         = local.argocd_admin.user_name
+  display_name      = local.argocd_admin.display_name
 
   name {
-    given_name  = try(var.argocd_identity_admin.given_name, null)
-    family_name = try(var.argocd_identity_admin.family_name, null)
+    given_name  = local.argocd_admin.given_name
+    family_name = local.argocd_admin.family_name
   }
 
   emails {
-    value   = try(var.argocd_identity_admin.email, null)
+    value   = local.argocd_admin.email
     primary = true
   }
 
