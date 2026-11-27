@@ -26,10 +26,10 @@ resource "aws_cloudformation_stack" "argocd_identity" {
 
   lifecycle {
     prevent_destroy = false
-    precondition {
-      condition     = var.argocd_identity_admin != null
-      error_message = "Set argocd_identity_admin before enabling the Identity Center instance."
-    }
+    # precondition {
+    #   condition     = var.argocd_identity_admin != null
+    #   error_message = "Set argocd_identity_admin before enabling the Identity Center instance."
+    # }
   }
 }
 
