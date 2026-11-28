@@ -30,7 +30,8 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true
-      # Terraform owns these RGDs and destroys them after Argo applications.
+      # Keep the RGDs when this Application is deleted or pruned, so the
+      # composite kinds stay served while claims still reference them.
       - Delete=false
       - Prune=false
       # The kro.run ResourceGraphDefinition CRD is installed by the kro EKS

@@ -12,39 +12,17 @@ locals {
   root_chart_hash          = sha256(join("", [for f in sort(tolist(fileset(local.root_chart_path, "**"))) : filesha256("${local.root_chart_path}/${f}")]))
 }
 
-# The AWS provider does not expose an Identity Center instance resource.
-resource "aws_cloudformation_stack" "argocd_identity" {
-  count = var.enable_argocd_identity ? 1 : 0
-
-  name = "argocd-identity-center"
-  template_body = jsonencode({
-    Resources = {
-      IdentityCenter = {
-        Type = "AWS::SSO::Instance"
-        Properties = {
-          Name = "argocd-identity-center"
-        }
-      }
-    }
-    Outputs = {
-      InstanceArn     = { Value = { "Fn::GetAtt" = ["IdentityCenter", "InstanceArn"] } }
-      IdentityStoreId = { Value = { "Fn::GetAtt" = ["IdentityCenter", "IdentityStoreId"] } }
-    }
-  })
-
-  lifecycle {
-    prevent_destroy = false
-    # precondition {
-    #   condition     = var.argocd_identity_admin != null
-    #   error_message = "Set argocd_identity_admin before enabling the Identity Center instance."
-    # }
-  }
+# The existing account instance lives in us-east-1 (home region cannot change).
+data "aws_ssoadmin_instances" "argocd_identity" {
+  provider = aws.identity_center
+  count    = var.enable_argocd_identity ? 1 : 0
 }
 
 resource "aws_identitystore_user" "argocd_admin" {
-  count = var.enable_argocd_identity ? 1 : 0
+  provider = aws.identity_center
+  count    = var.enable_argocd_identity ? 1 : 0
 
-  identity_store_id = aws_cloudformation_stack.argocd_identity[0].outputs["IdentityStoreId"]
+  identity_store_id = data.aws_ssoadmin_instances.argocd_identity[0].identity_store_ids[0]
   user_name         = local.argocd_admin.user_name
   display_name      = local.argocd_admin.display_name
 
@@ -110,8 +88,8 @@ resource "aws_eks_capability" "managed_argocd" {
     argo_cd {
       namespace = local.managed_argocd_namespace
       aws_idc {
-        idc_instance_arn = try(aws_cloudformation_stack.argocd_identity[0].outputs["InstanceArn"], null)
-        idc_region       = var.aws_region
+        idc_instance_arn = try(data.aws_ssoadmin_instances.argocd_identity[0].arns[0], null)
+        idc_region       = "us-east-1"
       }
       rbac_role_mapping {
         role = "ADMIN"

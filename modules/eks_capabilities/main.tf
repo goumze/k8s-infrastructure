@@ -181,18 +181,3 @@ resource "aws_eks_access_policy_association" "ci" {
 
   depends_on = [aws_eks_access_entry.ci]
 }
-
-# RGDs are applied with kubectl_manifest, which does not need the kro CRDs
-# at plan time (unlike kubernetes_manifest), so a fresh cluster can plan.
-resource "kubectl_manifest" "rgd" {
-  for_each = fileset("${path.module}/rgds", "*.yaml")
-
-  yaml_body = file("${path.module}/rgds/${each.value}")
-
-  depends_on = [
-    aws_eks_capability.kro,
-    aws_eks_capability.ack,
-    kubectl_manifest.kro_ack_watch_binding,
-    kubectl_manifest.kro_ack_binding,
-  ]
-}
