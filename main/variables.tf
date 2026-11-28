@@ -53,7 +53,7 @@ variable "enable_argocd_identity" {
 }
 
 variable "argocd_identity_admin" {
-  description = "Identity Center administrator details. Set through a private tfvars file or environment variable."
+  description = "Identity Center administrator details, supplied by the ARGOCD_IDENTITY_ADMIN secret in CI."
   type = object({
     user_name    = string
     display_name = string
