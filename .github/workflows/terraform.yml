@@ -11,7 +11,12 @@ on:
   workflow_dispatch:
     inputs:
       apply:
-        description: "Apply the generated Terraform plan"
+        description: "Apply the generated Terraform plan (pushes always apply)"
+        required: true
+        default: false
+        type: boolean
+      destroy:
+        description: "Destroy all managed infrastructure instead of applying"
         required: true
         default: false
         type: boolean
@@ -64,6 +69,15 @@ jobs:
             echo "TF_VAR_ci_principal_arn=$CI_PRINCIPAL_ARN" >> "$GITHUB_ENV"
           fi
 
+      # Identity Center admin is supplied as a JSON secret so no personal data is committed.
+      - name: Export Argo CD Identity Center admin
+        env:
+          ARGOCD_IDENTITY_ADMIN: ${{ secrets.ARGOCD_IDENTITY_ADMIN }}
+        run: |
+          if [ -n "$ARGOCD_IDENTITY_ADMIN" ]; then
+            echo "TF_VAR_argocd_identity_admin=$ARGOCD_IDENTITY_ADMIN" >> "$GITHUB_ENV"
+          fi
+
       - name: Check Terraform formatting
         working-directory: .
         run: terraform fmt -check -recursive
@@ -77,10 +91,10 @@ jobs:
       - name: Create Terraform plan
         run: terraform plan -input=false -out=tfplan
 
-      #recommit comment again
-      # - name: Apply Terraform plan
-      #   run: terraform apply -input=false -auto-approve tfplan
+      # Identity Center is applied first (module.identity_center), then the managed
+      # Argo CD capability, then the root apps that depend on kro/ACK.
+      - name: Apply Terraform plan
+        run: terraform apply -input=false -auto-approve tfplan
 
-      ##Commenting for destroy, commenting again
-      - name: Apply Terraform destroy
-        run: terraform destroy -input=false -auto-approve
+      # - name: Destroy Terraform
+      #   run: terraform destroy -input=false -auto-approve

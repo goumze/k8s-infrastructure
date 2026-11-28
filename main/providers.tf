@@ -37,20 +37,6 @@ provider "aws" {
   }
 }
 
-# IAM Identity Center account instance has its home region fixed at us-east-1.
-provider "aws" {
-  alias  = "identity_center"
-  region = "us-east-1"
-
-  default_tags {
-    tags = {
-      Environment = "production"
-      Project     = "k8s-cluster"
-      ManagedBy   = "Terraform"
-    }
-  }
-}
-
 data "aws_eks_cluster_auth" "cluster" {
   name = module.cluster.cluster_name
 }

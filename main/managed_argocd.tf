@@ -1,44 +1,17 @@
 locals {
-  # Temporary dummy Identity Center admin for teardown. Replace before real use.
-  argocd_admin = {
-    user_name    = "dummyadmin"
-    display_name = "Dummy Admin"
-    given_name   = "Dummy"
-    family_name  = "Admin"
-    email        = "dummy.admin@example.com"
-  }
   managed_argocd_namespace = "argocd-managed"
   root_chart_path          = "${path.module}/../modules/multi-agent-fsi-blog/gitops/root"
   root_chart_hash          = sha256(join("", [for f in sort(tolist(fileset(local.root_chart_path, "**"))) : filesha256("${local.root_chart_path}/${f}")]))
 }
 
-# The existing account instance lives in us-east-1 (home region cannot change).
-data "aws_ssoadmin_instances" "argocd_identity" {
-  provider = aws.identity_center
-  count    = var.enable_argocd_identity ? 1 : 0
-}
+# Stage 1: Identity Center identities. The account instance lives in the same region
+# as the cluster (ap-south-1), so the default provider is used.
+module "identity_center" {
+  source = "../modules/identity_center"
+  count  = var.enable_argocd_identity ? 1 : 0
 
-resource "aws_identitystore_user" "argocd_admin" {
-  provider = aws.identity_center
-  count    = var.enable_argocd_identity ? 1 : 0
-
-  identity_store_id = data.aws_ssoadmin_instances.argocd_identity[0].identity_store_ids[0]
-  user_name         = local.argocd_admin.user_name
-  display_name      = local.argocd_admin.display_name
-
-  name {
-    given_name  = local.argocd_admin.given_name
-    family_name = local.argocd_admin.family_name
-  }
-
-  emails {
-    value   = local.argocd_admin.email
-    primary = true
-  }
-
-  lifecycle {
-    prevent_destroy = false
-  }
+  region = var.aws_region
+  admin  = var.argocd_identity_admin
 }
 
 data "aws_iam_policy_document" "managed_argocd_assume_role" {
@@ -88,14 +61,14 @@ resource "aws_eks_capability" "managed_argocd" {
     argo_cd {
       namespace = local.managed_argocd_namespace
       aws_idc {
-        idc_instance_arn = try(data.aws_ssoadmin_instances.argocd_identity[0].arns[0], null)
-        idc_region       = "us-east-1"
+        idc_instance_arn = try(module.identity_center[0].instance_arn, null)
+        idc_region       = var.aws_region
       }
       rbac_role_mapping {
         role = "ADMIN"
         identity {
-          id   = try(aws_identitystore_user.argocd_admin[0].user_id, null)
-          type = "SSO_USER"
+          id   = try(module.identity_center[0].admin_group_id, null)
+          type = "SSO_GROUP"
         }
       }
     }
@@ -109,7 +82,11 @@ resource "aws_eks_capability" "managed_argocd" {
     }
   }
 
-  depends_on = [time_sleep.managed_argocd_role, kubectl_manifest.managed_argocd_namespace]
+  depends_on = [
+    module.identity_center,
+    time_sleep.managed_argocd_role,
+    kubectl_manifest.managed_argocd_namespace,
+  ]
 }
 
 resource "aws_eks_access_policy_association" "managed_argocd" {
@@ -181,7 +158,12 @@ resource "helm_release" "managed_root_apps" {
     prevent_destroy = false
   }
 
-  depends_on = [kubectl_manifest.managed_argocd_cluster]
+  # Keeps kro/ACK running while the root apps are created and, on destroy, while the
+  # apps are pruned. Without this, kro/ACK could be removed first and leave finalizers stuck.
+  depends_on = [
+    kubectl_manifest.managed_argocd_cluster,
+    module.eks_capabilities,
+  ]
 }
 
 output "managed_argocd_server_url" {

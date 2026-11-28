@@ -1,5 +1,6 @@
 module "iam" {
-  source = "../modules/iam"
+  source     = "../modules/iam"
+  depends_on = [module.identity_center]
 }
 
 module "network" {
