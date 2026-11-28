@@ -81,6 +81,6 @@ jobs:
       # - name: Apply Terraform plan
       #   run: terraform apply -input=false -auto-approve tfplan
 
-      ##Commenting for destroy, commenting
+      ##Commenting for destroy, commenting again
       - name: Apply Terraform destroy
         run: terraform destroy -input=false -auto-approve
