@@ -31,6 +31,7 @@ module "eks_capabilities" {
 
 module "argocd" {
   source = "../modules/argocd"
+  count  = var.enable_managed_argocd ? 0 : 1
 
   cluster_name    = module.cluster.cluster_name
   region          = var.aws_region
