@@ -18,6 +18,11 @@ variable "admin" {
     family_name  = string
     email        = string
   })
+
+  validation {
+    condition     = var.admin != null
+    error_message = "Set the ARGOCD_IDENTITY_ADMIN repository secret (JSON with user_name, display_name, given_name, family_name, email) or set enable_argocd_identity to false."
+  }
 }
 
 variable "admin_group_name" {
