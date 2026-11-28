@@ -178,7 +178,7 @@ resource "helm_release" "managed_root_apps" {
   })]
 
   lifecycle {
-    prevent_destroy = true
+    prevent_destroy = false
   }
 
   depends_on = [kubectl_manifest.managed_argocd_cluster]
