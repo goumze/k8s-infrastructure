@@ -93,8 +93,8 @@ jobs:
 
       # Identity Center is applied first (module.identity_center), then the managed
       # Argo CD capability, then the root apps that depend on kro/ACK.
-      # - name: Apply Terraform plan
-      #   run: terraform apply -input=false -auto-approve tfplan
+      - name: Apply Terraform plan
+        run: terraform apply -input=false -auto-approve tfplan
 
-      - name: Destroy Terraform
-        run: terraform destroy -input=false -auto-approve
+      # - name: Destroy Terraform
+      #   run: terraform destroy -input=false -auto-approve
